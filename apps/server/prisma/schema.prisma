@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model SubscriptionSource {
+  id            String      @id @default(cuid())
+  name          String
+  url           String
+  enabled       Boolean     @default(true)
+  lastFetchedAt DateTime?
+  fetchStatus   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  nodes         ProxyNode[]
+}
+
+model ProxyNode {
+  id        String              @id @default(cuid())
+  name      String
+  type      String
+  server    String
+  port      Int?
+  raw       Json
+  enabled   Boolean             @default(true)
+  tags      String              @default("[]")
+  sourceId  String?
+  createdAt DateTime            @default(now())
+  source    SubscriptionSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  groups    ProxyGroup[]
+}
+
+model ProxyGroup {
+  id       String      @id @default(cuid())
+  name     String
+  type     String
+  enabled  Boolean     @default(true)
+  sort     Int         @default(0)
+  nodes    ProxyNode[]
+  profiles Profile[]
+}
+
+model Rule {
+  id      String    @id @default(cuid())
+  type    String
+  value   String
+  policy  String
+  enabled Boolean   @default(true)
+  sort    Int       @default(0)
+  profiles Profile[]
+}
+
+model Profile {
+  id        String       @id @default(cuid())
+  name      String
+  token     String       @unique
+  enabled   Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  groups    ProxyGroup[]
+  rules     Rule[]
+}
