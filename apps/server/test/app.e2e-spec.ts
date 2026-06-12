@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -13,14 +14,25 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api', { exclude: ['publish/:token'] });
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
   it('/ (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api')
       .expect(200)
       .expect('Hello World!');
+  });
+
+  it('/api/rules/reorder (PUT) returns 400 when ids is missing', () => {
+    return request(app.getHttpServer())
+      .put('/api/rules/reorder')
+      .send({})
+      .expect(400);
   });
 
   afterEach(async () => {
