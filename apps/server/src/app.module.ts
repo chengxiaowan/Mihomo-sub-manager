@@ -10,7 +10,15 @@ import { GeneratorModule } from './generator/generator.module';
 import { PublishModule } from './publish/publish.module';
 
 @Module({
-  imports: [PrismaModule, SubscriptionModule, ProxyNodeModule, RuleModule, ProfileModule, GeneratorModule, PublishModule],
+  imports: [
+    PrismaModule,
+    SubscriptionModule,
+    ProxyNodeModule,
+    RuleModule,
+    ProfileModule,
+    GeneratorModule,
+    PublishModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
