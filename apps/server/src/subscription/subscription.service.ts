@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OperationLogService } from '../operation-log/operation-log.service';
 import { SubscriptionParserService } from './subscription-parser.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
@@ -11,6 +12,7 @@ export class SubscriptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly parser: SubscriptionParserService,
+    private readonly opLog: OperationLogService,
   ) {}
 
   findAll() {
@@ -27,8 +29,20 @@ export class SubscriptionService {
     return source;
   }
 
-  create(dto: CreateSubscriptionDto) {
-    return this.prisma.subscriptionSource.create({ data: dto });
+  async create(dto: CreateSubscriptionDto) {
+    const source = await this.prisma.subscriptionSource.create({ data: dto });
+    this.opLog
+      .write({
+        action: 'subscription.create',
+        entityType: 'SubscriptionSource',
+        entityId: source.id,
+        status: 'success',
+        message: `添加订阅源「${source.name}」`,
+      })
+      .catch((err: unknown) =>
+        this.logger.warn('写入操作日志失败', (err as Error).message),
+      );
+    return source;
   }
 
   async update(id: string, dto: UpdateSubscriptionDto) {
@@ -57,6 +71,18 @@ export class SubscriptionService {
           where: { id },
           data: { fetchStatus: 'success', lastFetchedAt: new Date() },
         });
+        this.opLog
+          .write({
+            action: 'subscription.refresh',
+            entityType: 'SubscriptionSource',
+            entityId: id,
+            status: 'info',
+            message: `刷新订阅「${source.name}」：解析结果为空`,
+            detail: { nodesAdded: 0 },
+          })
+          .catch((err: unknown) =>
+            this.logger.warn('写入操作日志失败', (err as Error).message),
+          );
         return { nodesAdded: 0 };
       }
 
@@ -108,12 +134,36 @@ export class SubscriptionService {
         });
       });
 
+      this.opLog
+        .write({
+          action: 'subscription.refresh',
+          entityType: 'SubscriptionSource',
+          entityId: id,
+          status: 'success',
+          message: `刷新订阅「${source.name}」成功，新增 ${nodes.length} 个节点`,
+          detail: { nodesAdded: nodes.length },
+        })
+        .catch((err: unknown) =>
+          this.logger.warn('写入操作日志失败', (err as Error).message),
+        );
       return { nodesAdded: nodes.length };
     } catch (e) {
       await this.prisma.subscriptionSource.update({
         where: { id },
         data: { fetchStatus: 'error', lastFetchedAt: new Date() },
       });
+      this.opLog
+        .write({
+          action: 'subscription.refresh',
+          entityType: 'SubscriptionSource',
+          entityId: id,
+          status: 'error',
+          message: `刷新订阅「${source.name}」失败`,
+          detail: { error: (e as Error).message },
+        })
+        .catch((err: unknown) =>
+          this.logger.warn('写入操作日志失败', (err as Error).message),
+        );
       throw e;
     }
   }

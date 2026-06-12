@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { OperationLogModule } from './operation-log/operation-log.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { ProxyNodeModule } from './proxy-node/proxy-node.module';
 import { RuleModule } from './rule/rule.module';
@@ -12,6 +13,7 @@ import { PublishModule } from './publish/publish.module';
 @Module({
   imports: [
     PrismaModule,
+    OperationLogModule,
     SubscriptionModule,
     ProxyNodeModule,
     RuleModule,
