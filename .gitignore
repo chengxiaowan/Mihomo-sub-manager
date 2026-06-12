@@ -1,2 +1,4 @@
 node_modules
 /doc
+data/app.db
+.pnpm-store

@@ -33,4 +33,9 @@ export class SubscriptionController {
   remove(@Param('id') id: string) {
     return this.subscriptionService.remove(id);
   }
+
+  @Post(':id/refresh')
+  refresh(@Param('id') id: string) {
+    return this.subscriptionService.refresh(id);
+  }
 }

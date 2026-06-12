@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionParserService } from './subscription-parser.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SubscriptionService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly parser: SubscriptionParserService,
+  ) {}
 
   findAll() {
     return this.prisma.subscriptionSource.findMany({
@@ -33,5 +39,91 @@ export class SubscriptionService {
   async remove(id: string) {
     await this.findOne(id);
     return this.prisma.subscriptionSource.delete({ where: { id } });
+  }
+
+  async refresh(id: string) {
+    const source = await this.findOne(id);
+
+    await this.prisma.subscriptionSource.update({
+      where: { id },
+      data: { fetchStatus: 'fetching' },
+    });
+
+    try {
+      const nodes = await this.parser.fetchAndParse(source.url);
+      if (nodes.length === 0) {
+        this.logger.warn(`订阅 ${id} 解析结果为空`);
+        await this.prisma.subscriptionSource.update({
+          where: { id },
+          data: { fetchStatus: 'success', lastFetchedAt: new Date() },
+        });
+        return { nodesAdded: 0 };
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        const oldNodes = await tx.proxyNode.findMany({
+          where: { sourceId: id },
+          select: {
+            name: true,
+            type: true,
+            server: true,
+            port: true,
+            groups: { select: { id: true } },
+          },
+        });
+        const groupsByNode = new Map<string, Set<string>>();
+        for (const node of oldNodes) {
+          groupsByNode.set(
+            this.nodeKey(node),
+            new Set(node.groups.map((group) => group.id)),
+          );
+        }
+
+        // 删除该订阅源的旧节点，重新写入；事务失败时旧节点会回滚。
+        await tx.proxyNode.deleteMany({ where: { sourceId: id } });
+        for (const node of nodes) {
+          const groupIds = [...(groupsByNode.get(this.nodeKey(node)) ?? [])];
+          await tx.proxyNode.create({
+            data: {
+              name: node.name,
+              type: node.type,
+              server: node.server,
+              port: node.port,
+              raw: node.raw as never,
+              sourceId: id,
+              ...(groupIds.length
+                ? {
+                    groups: {
+                      connect: groupIds.map((groupId) => ({ id: groupId })),
+                    },
+                  }
+                : {}),
+            },
+          });
+        }
+
+        await tx.subscriptionSource.update({
+          where: { id },
+          data: { fetchStatus: 'success', lastFetchedAt: new Date() },
+        });
+      });
+
+      return { nodesAdded: nodes.length };
+    } catch (e) {
+      await this.prisma.subscriptionSource.update({
+        where: { id },
+        data: { fetchStatus: 'error', lastFetchedAt: new Date() },
+      });
+      throw e;
+    }
+  }
+
+  private nodeKey(node: {
+    name: string;
+    type: string;
+    server: string;
+    port: number | null;
+  }) {
+    return [node.type, node.server, node.port ?? '', node.name].join('\u0000');
   }
 }
