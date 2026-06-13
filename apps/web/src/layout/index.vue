@@ -11,8 +11,8 @@ const navItems = [
   { key: "subscriptions", label: "订阅源", to: "/subscriptions" },
   { key: "nodes", label: "节点库", to: "/nodes" },
   { key: "proxy-groups", label: "代理组", to: "/proxy-groups" },
-  { key: "rules", label: "规则", to: "/rules" },
   { key: "profiles", label: "配置方案", to: "/profiles" },
+  { key: "rule-market", label: "规则市场", to: "/rule-market" },
 ];
 
 const isDark = ref(true);

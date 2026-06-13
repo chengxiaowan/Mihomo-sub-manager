@@ -49,7 +49,7 @@ async function submit() {
       <h1 class="title">Mihomo Sub Manager</h1>
       <p class="subtitle">请配置服务器地址和 API 密钥以继续</p>
 
-      <a-form layout="vertical">
+      <a-form :model="form" layout="vertical">
         <a-form-item label="服务器地址">
           <a-input
             v-model="form.serverUrl"

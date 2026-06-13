@@ -3,7 +3,10 @@
     "allow": [
       "Bash(pnpm run *)",
       "Bash(pnpm add *)",
-      "Bash(npx vue-tsc *)"
+      "Bash(npx vue-tsc *)",
+      "Bash(pnpm prisma *)",
+      "Bash(PRISMA_FORCE_TRANSACTIONS=1 pnpm prisma migrate dev --name add-profile-rule-and-rule-template --skip-generate)",
+      "Bash(PRISMA_MIGRATE_SKIP_WARNINGS=true pnpm prisma migrate dev --name add-profile-rule-and-rule-template --create-only)"
     ]
   }
 }

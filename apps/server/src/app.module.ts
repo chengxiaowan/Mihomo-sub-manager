@@ -7,8 +7,9 @@ import { OperationLogModule } from './operation-log/operation-log.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { ProxyNodeModule } from './proxy-node/proxy-node.module';
 import { ProxyGroupModule } from './proxy-group/proxy-group.module';
-import { RuleModule } from './rule/rule.module';
 import { ProfileModule } from './profile/profile.module';
+import { ProfileRuleModule } from './profile-rule/profile-rule.module';
+import { RuleTemplateModule } from './rule-template/rule-template.module';
 import { GeneratorModule } from './generator/generator.module';
 import { PublishModule } from './publish/publish.module';
 
@@ -19,8 +20,9 @@ import { PublishModule } from './publish/publish.module';
     SubscriptionModule,
     ProxyNodeModule,
     ProxyGroupModule,
-    RuleModule,
     ProfileModule,
+    ProfileRuleModule,
+    RuleTemplateModule,
     GeneratorModule,
     PublishModule,
   ],

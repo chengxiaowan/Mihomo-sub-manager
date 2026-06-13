@@ -43,9 +43,13 @@ export class GeneratorService {
       return entry;
     });
 
-    const rules = profile.rules.map(
-      (r) => `${r.type},${r.value ? r.value + ',' : ''}${r.policy}`,
+    // 构建规则列表，过滤掉已禁用的
+    const rules: string[] = profile.rules.map(
+      (r) => `${r.type}${r.value ? ',' + r.value : ''},${r.policy}`,
     );
+
+    // 追加 MATCH 兜底规则
+    rules.push(`MATCH,${profile.defaultPolicy}`);
 
     const doc: Record<string, unknown> = {
       proxies,

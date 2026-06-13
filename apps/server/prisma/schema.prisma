@@ -43,24 +43,45 @@ model ProxyGroup {
   profiles Profile[]
 }
 
-model Rule {
-  id      String    @id @default(cuid())
-  type    String
-  value   String
-  policy  String
-  enabled Boolean   @default(true)
-  sort    Int       @default(0)
-  profiles Profile[]
+model ProfileRule {
+  id        String   @id @default(cuid())
+  type      String
+  value     String?
+  policy    String
+  sort      Int      @default(0)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
 
 model Profile {
-  id        String       @id @default(cuid())
-  name      String
-  token     String       @unique
-  enabled   Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  groups    ProxyGroup[]
-  rules     Rule[]
+  id            String        @id @default(cuid())
+  name          String
+  token         String        @unique
+  enabled       Boolean       @default(true)
+  defaultPolicy String        @default("DIRECT")
+  createdAt     DateTime      @default(now())
+  groups        ProxyGroup[]
+  rules         ProfileRule[]
+}
+
+model RuleTemplate {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  items       RuleTemplateItem[]
+}
+
+model RuleTemplateItem {
+  id         String       @id @default(cuid())
+  type       String
+  value      String?
+  sort       Int          @default(0)
+  templateId String
+  template   RuleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 model OperationLog {

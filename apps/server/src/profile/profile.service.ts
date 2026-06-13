@@ -3,7 +3,6 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { BindProfileDto } from './dto/bind-profile.dto';
 
 @Injectable()
 export class ProfileService {
@@ -21,7 +20,7 @@ export class ProfileService {
   async findOne(id: string) {
     const profile = await this.prisma.profile.findUnique({
       where: { id },
-      include: { groups: true, rules: { orderBy: { sort: 'asc' } } },
+      include: { groups: true },
     });
     if (!profile) throw new NotFoundException(`Profile ${id} not found`);
     return profile;
@@ -64,19 +63,12 @@ export class ProfileService {
     return this.prisma.profile.update({ where: { id }, data: { token } });
   }
 
-  async bind(id: string, dto: BindProfileDto) {
+  async bindGroups(id: string, groupIds: string[]) {
     await this.findOne(id);
-    const data: Record<string, unknown> = {};
-    if (dto.groupIds !== undefined) {
-      data['groups'] = { set: dto.groupIds.map((gid) => ({ id: gid })) };
-    }
-    if (dto.ruleIds !== undefined) {
-      data['rules'] = { set: dto.ruleIds.map((rid) => ({ id: rid })) };
-    }
     return this.prisma.profile.update({
       where: { id },
-      data,
-      include: { groups: true, rules: { orderBy: { sort: 'asc' } } },
+      data: { groups: { set: groupIds.map((gid) => ({ id: gid })) } },
+      include: { groups: true },
     });
   }
 }

@@ -21,16 +21,16 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/api/health (GET)', () => {
     return request(app.getHttpServer())
-      .get('/api')
+      .get('/api/health')
       .expect(200)
-      .expect('Hello World!');
+      .expect({ status: 'ok' });
   });
 
-  it('/api/rules/reorder (PUT) returns 400 when ids is missing', () => {
+  it('/api/profiles/:profileId/rules/reorder (PUT) returns 400 when ids is missing', () => {
     return request(app.getHttpServer())
-      .put('/api/rules/reorder')
+      .put('/api/profiles/any/rules/reorder')
       .send({})
       .expect(400);
   });

@@ -19,9 +19,6 @@ function typeStyle(type: string) {
   return TYPE_COLOR[type] ?? { color: "#595959", bg: "#f5f5f5" };
 }
 
-function parseTags(raw: string): string[] {
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
-}
 
 async function load() {
   loading.value = true;
@@ -44,7 +41,7 @@ async function toggleEnabled(node: ProxyNode) {
 
 function confirmDelete(node: ProxyNode) {
   Modal.confirm({
-    title: `删除节点「${node.name}」？`,
+    title: `删除节点「${node.name}」？`, content: "",
     okText: "确认删除",
     okButtonProps: { status: "danger" },
     onOk: async () => { await nodeApi.remove(node.id); Message.success("已删除"); await load(); },

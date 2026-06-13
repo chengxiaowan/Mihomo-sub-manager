@@ -10,4 +10,9 @@ export class CreateProfileDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @ApiPropertyOptional({ description: '兜底策略，用于 MATCH 规则，默认 DIRECT', default: 'DIRECT' })
+  @IsOptional()
+  @IsString()
+  defaultPolicy?: string;
 }

@@ -116,7 +116,7 @@ onMounted(load);
     </a-spin>
 
     <a-modal v-model:visible="modalVisible" :title="editing ? '编辑订阅源' : '添加订阅源'" @ok="submitForm" :ok-loading="submitting">
-      <a-form layout="vertical">
+      <a-form :model="form" layout="vertical">
         <a-form-item label="名称"><a-input v-model="form.name" placeholder="机场A" /></a-form-item>
         <a-form-item label="订阅地址"><a-input v-model="form.url" placeholder="https://..." /></a-form-item>
         <a-form-item label="启用"><a-switch v-model="form.enabled" /></a-form-item>

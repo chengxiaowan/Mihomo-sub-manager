@@ -73,7 +73,7 @@ async function submitForm() {
 
 function confirmDelete(row: ProxyGroup) {
   Modal.confirm({
-    title: `删除代理组「${row.name}」？`, okText: "确认删除", okButtonProps: { status: "danger" },
+    title: `删除代理组「${row.name}」？`, content: "", okText: "确认删除", okButtonProps: { status: "danger" },
     onOk: async () => { await groupApi.remove(row.id); Message.success("已删除"); await load(); },
   });
 }
@@ -122,7 +122,7 @@ onMounted(load);
               <span class="group-name">{{ group.name }}</span>
               <a-switch
                 :model-value="group.enabled" size="small"
-                @change="async (v: boolean) => { await groupApi.update(group.id, { enabled: v }); group.enabled = v; }"
+                @change="async (v: unknown) => { await groupApi.update(group.id, { enabled: v as boolean }); group.enabled = v as boolean; }"
               />
             </div>
             <span class="type-chip" :style="{ color: typeConf(group.type).color, background: typeConf(group.type).bg }">
@@ -157,7 +157,7 @@ onMounted(load);
 
     <!-- 创建/编辑 -->
     <a-modal v-model:visible="modalVisible" :title="editing ? '编辑代理组' : '创建代理组'" @ok="submitForm" :ok-loading="submitting">
-      <a-form layout="vertical">
+      <a-form :model="form" layout="vertical">
         <a-form-item label="名称"><a-input v-model="form.name" placeholder="手动选择" /></a-form-item>
         <a-form-item label="类型">
           <a-select v-model="form.type">

@@ -29,14 +29,14 @@ const routes = [
         component: () => import("@/views/proxy-groups.vue"),
       },
       {
-        path: "rules",
-        name: "Rules",
-        component: () => import("@/views/rules.vue"),
-      },
-      {
         path: "profiles",
         name: "Profiles",
         component: () => import("@/views/profiles.vue"),
+      },
+      {
+        path: "rule-market",
+        name: "RuleMarket",
+        component: () => import("@/views/rule-market.vue"),
       },
       { path: ":pathMatch(.*)*", redirect: "/subscriptions" },
     ],
