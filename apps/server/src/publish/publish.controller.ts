@@ -2,12 +2,14 @@ import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { GeneratorService } from '../generator/generator.service';
+import { SkipAuth } from '../auth/skip-auth.decorator';
 
 @ApiTags('publish')
 @Controller('publish')
 export class PublishController {
   constructor(private readonly generator: GeneratorService) {}
 
+  @SkipAuth()
   @Get(':token.yaml')
   @ApiOperation({ summary: '按 token 返回 Mihomo 订阅 YAML' })
   async publish(@Param('token') token: string, @Res() res: Response) {

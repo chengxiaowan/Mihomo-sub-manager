@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ApiKeyGuard } from './auth/api-key.guard';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { OperationLogModule } from './operation-log/operation-log.module';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -24,6 +25,8 @@ import { PublishModule } from './publish/publish.module';
     PublishModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
+  ],
 })
 export class AppModule {}

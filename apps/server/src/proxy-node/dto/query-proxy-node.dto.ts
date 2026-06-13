@@ -5,7 +5,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  Max,
   Min,
 } from 'class-validator';
 
@@ -47,11 +46,10 @@ export class QueryProxyNodeDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: '每页数量，最大 200', default: 50 })
+  @ApiPropertyOptional({ description: '每页数量，默认 50', default: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
   pageSize?: number;
 }

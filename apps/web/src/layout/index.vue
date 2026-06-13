@@ -1,42 +1,50 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import { useConfigStore } from "@/stores/config";
+import { router } from "@/router";
+
+const route = useRoute();
+const config = useConfigStore();
 
 const navItems = [
-  { key: "home", label: "首页", active: true },
-  { key: "sources", label: "订阅源" },
-  { key: "nodes", label: "节点列表" },
-  { key: "rules", label: "规则配置" },
-  { key: "publish", label: "发布管理" },
+  { key: "subscriptions", label: "订阅源", to: "/subscriptions" },
+  { key: "nodes", label: "节点库", to: "/nodes" },
+  { key: "proxy-groups", label: "代理组", to: "/proxy-groups" },
+  { key: "rules", label: "规则", to: "/rules" },
+  { key: "profiles", label: "配置方案", to: "/profiles" },
 ];
 
 const isDark = ref(true);
 
 const syncTheme = (dark: boolean) => {
-  if (typeof document !== "undefined") {
-    document.body.setAttribute("arco-theme", dark ? "dark" : "light");
-  }
+  document.body.setAttribute("arco-theme", dark ? "dark" : "light");
 };
 
 watch(isDark, syncTheme, { immediate: true });
+
+function logout() {
+  config.clear();
+  router.push("/setup");
+}
 </script>
 
 <template>
   <div class="app-shell">
     <header class="top-nav">
       <div class="nav-inner">
-        <RouterLink class="brand" to="/dashboard">Mihomo Sub</RouterLink>
+        <RouterLink class="brand" to="/subscriptions">Mihomo Sub</RouterLink>
 
         <nav class="nav-links" aria-label="Primary navigation">
-          <button
+          <RouterLink
             v-for="item in navItems"
             :key="item.key"
-            type="button"
+            :to="item.to"
             class="nav-link"
-            :class="{ active: item.active }"
-            :aria-current="item.active ? 'page' : undefined"
+            :class="{ active: route.path.startsWith(item.to) }"
           >
             {{ item.label }}
-          </button>
+          </RouterLink>
         </nav>
 
         <div class="account">
@@ -51,6 +59,9 @@ watch(isDark, syncTheme, { immediate: true });
               <icon-sun-fill v-if="isDark" />
               <icon-moon-fill v-else />
             </template>
+          </a-button>
+          <a-button type="text" shape="circle" class="theme-button" title="重新配置" @click="logout">
+            <template #icon><icon-settings /></template>
           </a-button>
         </div>
       </div>
@@ -67,9 +78,7 @@ watch(isDark, syncTheme, { immediate: true });
   min-height: 100vh;
   color: var(--color-text-1);
   background: var(--color-bg-2);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .top-nav {
@@ -93,52 +102,48 @@ watch(isDark, syncTheme, { immediate: true });
   flex: 0 0 auto;
   color: var(--color-text-1);
   font-size: 21px;
-  line-height: 1;
   font-weight: 800;
-  letter-spacing: 0;
+  text-decoration: none;
 }
 
 .nav-links {
-  min-width: 0;
   flex: 1 1 auto;
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .nav-link {
   height: 36px;
   padding: 0 12px;
-  border: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   border-radius: 7px;
   color: var(--color-text-2);
-  background: transparent;
   font-size: 14px;
   font-weight: 600;
-  line-height: 1;
+  text-decoration: none;
   white-space: nowrap;
-  cursor: default;
-}
+  transition: color 0.15s, background 0.15s;
 
-.nav-link:hover {
-  color: rgb(var(--arcoblue-6));
-  background: var(--color-fill-2);
-}
+  &:hover {
+    color: rgb(var(--arcoblue-6));
+    background: var(--color-fill-2);
+  }
 
-.nav-link.active {
-  color: rgb(var(--arcoblue-6));
-  background: var(--color-fill-2);
+  &.active {
+    color: rgb(var(--arcoblue-6));
+    background: var(--color-fill-2);
+  }
 }
 
 .account {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 4px;
 }
 
 .theme-button {
@@ -146,11 +151,11 @@ watch(isDark, syncTheme, { immediate: true });
   height: 38px;
   color: var(--color-text-2);
   font-size: 20px;
-}
 
-.theme-button:hover {
-  color: rgb(var(--arcoblue-6));
-  background: var(--color-fill-2);
+  &:hover {
+    color: rgb(var(--arcoblue-6));
+    background: var(--color-fill-2);
+  }
 }
 
 .page {
@@ -162,26 +167,20 @@ watch(isDark, syncTheme, { immediate: true });
 @media (max-width: 820px) {
   .nav-inner {
     height: auto;
-    align-items: flex-start;
     flex-direction: column;
-    gap: 14px;
-    padding: 16px;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
   }
 
   .nav-links {
     width: 100%;
-    height: 42px;
-    gap: 22px;
+    height: 40px;
     overflow-x: auto;
   }
 
-  .account {
-    width: 100%;
-    justify-content: space-between;
-  }
-
   .page {
-    padding: 22px 16px 36px;
+    padding: 20px 16px 36px;
   }
 }
 </style>

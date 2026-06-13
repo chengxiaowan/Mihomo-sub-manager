@@ -11,7 +11,7 @@ import { vitePluginForArco } from "@arco-plugins/vite-vue";
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   return {
-    base: mode === "production" ? "/" : "./",
+    base: "/",
     envDir: "./environments",
     plugins: [
       vue(),

@@ -8,6 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // /publish/:token.yaml 供 Mihomo 客户端直接订阅，不带 /api 前缀
+  app.enableCors();
   app.setGlobalPrefix('api', { exclude: ['publish/:token'] });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
