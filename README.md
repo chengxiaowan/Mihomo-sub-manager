@@ -11,7 +11,7 @@ Add multiple provider subscription URLs and generate one working Mihomo subscrip
 ## Tech Stack
 
 - Monorepo: pnpm workspaces
-- Backend: NestJS 11, Prisma 7, SQLite
+- Backend: NestJS 11 (with `@nestjs/schedule` for auto-update), Prisma 7, SQLite
 - Frontend: Vue 3, TypeScript, Vite, Arco Design Vue
 - Database: `data/app.db`
 - Planned deployment: Docker Compose
@@ -35,28 +35,44 @@ Profile -> generated Mihomo YAML
 GET /publish/:token.yaml -> client subscription import
 ```
 
-## Current Progress
+## Features
 
-Completed:
+**Subscription sources**
 
-- Prisma schema includes `SubscriptionSource`, `ProxyNode`, `ProxyGroup`, `Rule`, and `Profile`.
-- SQLite migrations have been created for the initial schema and proxy group relations.
-- Backend subscription source CRUD is implemented.
-- Frontend has Vue Router, Arco Design Vue on-demand component setup, a top navigation layout, dark/light theme toggle, and a dashboard with four status cards.
+- Add / edit / delete subscription URLs, with manual refresh.
+- Auto-fetch once right after a source is added.
+- Auto-update on an interval (off / 30m / 1h / 6h / 12h / 24h) driven by a scheduled job.
+- Exclude nodes by keyword per source (drops airport info nodes such as expiry/traffic/website).
 
-In progress / not implemented yet:
+**Node library**
 
-- Subscription fetching and parsing for `vmess`, `vless`, `trojan`, and `ss`.
-- Proxy node management APIs.
-- Proxy group management APIs.
-- Rule management APIs.
-- Profile management and token generation.
-- Mihomo YAML generation.
-- `/publish/:token.yaml` publishing endpoint.
-- Full frontend management pages for subscriptions, nodes, groups, rules, and profiles.
-- Docker deployment files.
+- Parse `vmess` / `vless` / `trojan` / `ss` (plus `ssr` / `http` passthrough) from base64, URI lists, or Clash YAML.
+- List, search, filter by type, enable/disable, delete. Group membership is preserved across refreshes.
 
-See [doc/tasks.md](doc/tasks.md) for the detailed checklist.
+**Proxy groups**
+
+- CRUD for `select` / `url-test` / `fallback` / `load-balance` groups; manage member nodes.
+
+**Profiles**
+
+- CRUD with a unique publish token and enable/disable.
+- Bind proxy groups and manage per-profile rules (with a default `MATCH` policy).
+- Per-profile base config (general + dns: `mixed-port`, `mode`, DNS nameservers, fake-ip, etc.) with default normalization.
+- Master/detail UI with tabs: overview / groups / rules / base config / publish.
+
+**Rule market**
+
+- Rule templates holding bulk entries; import into a profile with append or overwrite.
+
+**Operation logs**
+
+- Records subscription / group / profile mutations and refresh results, viewable in the UI.
+
+**Publishing**
+
+- `GET /publish/:token.yaml` generates a standard Mihomo YAML (`general` + `dns` + `proxies` + `proxy-groups` + `rules`).
+
+Not done yet: Docker deployment files. See [doc/tasks.md](doc/tasks.md) for the detailed checklist.
 
 ## Requirements
 
