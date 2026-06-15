@@ -7,15 +7,17 @@ datasource db {
 }
 
 model SubscriptionSource {
-  id            String      @id @default(cuid())
-  name          String
-  url           String
-  enabled       Boolean     @default(true)
-  lastFetchedAt DateTime?
-  fetchStatus   String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  nodes         ProxyNode[]
+  id              String      @id @default(cuid())
+  name            String
+  url             String
+  enabled         Boolean     @default(true)
+  refreshInterval Int?        // 自动更新间隔（分钟），null/0 = 关闭
+  excludeKeywords String      @default("[]") // 节点名排除关键字（JSON 字符串数组）
+  lastFetchedAt   DateTime?
+  fetchStatus     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  nodes           ProxyNode[]
 }
 
 model ProxyNode {

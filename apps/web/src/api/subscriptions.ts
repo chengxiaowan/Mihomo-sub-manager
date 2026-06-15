@@ -5,16 +5,26 @@ export interface Subscription {
   name: string;
   url: string;
   enabled: boolean;
+  refreshInterval: number | null;
+  excludeKeywords: string[];
   fetchStatus: string | null;
   lastFetchedAt: string | null;
   createdAt: string;
 }
 
+export type SubscriptionInput = {
+  name: string;
+  url: string;
+  enabled?: boolean;
+  refreshInterval?: number;
+  excludeKeywords?: string[];
+};
+
 export const subscriptionApi = {
   list: () => client.get<Subscription[]>("/subscriptions").then((r) => r.data),
-  create: (data: { name: string; url: string; enabled?: boolean }) =>
+  create: (data: SubscriptionInput) =>
     client.post<Subscription>("/subscriptions", data).then((r) => r.data),
-  update: (id: string, data: Partial<{ name: string; url: string; enabled: boolean }>) =>
+  update: (id: string, data: Partial<SubscriptionInput>) =>
     client.patch<Subscription>(`/subscriptions/${id}`, data).then((r) => r.data),
   remove: (id: string) => client.delete(`/subscriptions/${id}`),
   refresh: (id: string) =>

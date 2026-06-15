@@ -9,8 +9,20 @@ const loading = ref(false);
 const refreshingId = ref<string | null>(null);
 const modalVisible = ref(false);
 const editing = ref<Subscription | null>(null);
-const form = ref({ name: "", url: "", enabled: true });
+const form = ref({ name: "", url: "", enabled: true, refreshInterval: 0, excludeKeywords: [] as string[] });
 const submitting = ref(false);
+
+const INTERVAL_OPTIONS = [
+  { label: "关闭", value: 0 },
+  { label: "30 分钟", value: 30 },
+  { label: "1 小时", value: 60 },
+  { label: "6 小时", value: 360 },
+  { label: "12 小时", value: 720 },
+  { label: "24 小时", value: 1440 },
+];
+function intervalLabel(min: number | null) {
+  return INTERVAL_OPTIONS.find((o) => o.value === (min ?? 0))?.label ?? `${min} 分钟`;
+}
 
 function fmtTime(t: string | null) {
   if (!t) return "从未拉取";
@@ -25,10 +37,20 @@ async function load() {
 }
 
 function openCreate() {
-  editing.value = null; form.value = { name: "", url: "", enabled: true }; modalVisible.value = true;
+  editing.value = null;
+  form.value = { name: "", url: "", enabled: true, refreshInterval: 0, excludeKeywords: [] };
+  modalVisible.value = true;
 }
 function openEdit(row: Subscription) {
-  editing.value = row; form.value = { name: row.name, url: row.url, enabled: row.enabled }; modalVisible.value = true;
+  editing.value = row;
+  form.value = {
+    name: row.name,
+    url: row.url,
+    enabled: row.enabled,
+    refreshInterval: row.refreshInterval ?? 0,
+    excludeKeywords: [...(row.excludeKeywords ?? [])],
+  };
+  modalVisible.value = true;
 }
 
 async function submitForm() {
@@ -87,6 +109,17 @@ onMounted(load);
 
           <p class="sub-url">{{ sub.url }}</p>
 
+          <div class="sub-meta">
+            <span class="sub-chip">
+              <icon-clock-circle />
+              {{ sub.refreshInterval ? `每${intervalLabel(sub.refreshInterval)}` : "手动更新" }}
+            </span>
+            <span v-if="sub.excludeKeywords?.length" class="sub-chip">
+              <icon-filter />
+              排除 {{ sub.excludeKeywords.length }} 词
+            </span>
+          </div>
+
           <div class="sub-foot">
             <span class="sub-time">{{ fmtTime(sub.lastFetchedAt) }}</span>
             <div class="sub-actions">
@@ -120,6 +153,14 @@ onMounted(load);
       <a-form :model="form" layout="vertical">
         <a-form-item label="名称"><a-input v-model="form.name" placeholder="机场A" /></a-form-item>
         <a-form-item label="订阅地址"><a-input v-model="form.url" placeholder="https://..." /></a-form-item>
+        <a-form-item label="自动更新间隔">
+          <a-select v-model="form.refreshInterval">
+            <a-option v-for="o in INTERVAL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</a-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="排除关键字（节点名命中即丢弃）">
+          <a-input-tag v-model="form.excludeKeywords" placeholder="回车添加，如 到期、剩余、官网" allow-clear />
+        </a-form-item>
         <a-form-item label="启用"><a-switch v-model="form.enabled" /></a-form-item>
       </a-form>
     </a-modal>
@@ -151,6 +192,13 @@ onMounted(load);
 
 .sub-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .sub-name { font-size:15px; font-weight:700; color:var(--color-text-1); }
+
+.sub-meta { display:flex; flex-wrap:wrap; gap:6px; }
+.sub-chip {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:11px; color:var(--color-text-2);
+  background:var(--color-fill-2); padding:2px 8px; border-radius:8px;
+}
 
 .sub-status {
   display: flex; align-items: center; gap: 5px;

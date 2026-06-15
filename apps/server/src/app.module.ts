@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ApiKeyGuard } from './auth/api-key.guard';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
@@ -15,6 +16,7 @@ import { PublishModule } from './publish/publish.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     OperationLogModule,
     SubscriptionModule,
