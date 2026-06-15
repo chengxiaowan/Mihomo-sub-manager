@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { Message, Modal } from "@arco-design/web-vue";
 import { subscriptionApi, type Subscription } from "@/api/subscriptions";
+import { fetchStatusMeta } from "@/utils/badges";
 
 const list = ref<Subscription[]>([]);
 const loading = ref(false);
@@ -10,12 +11,6 @@ const modalVisible = ref(false);
 const editing = ref<Subscription | null>(null);
 const form = ref({ name: "", url: "", enabled: true });
 const submitting = ref(false);
-
-const STATUS: Record<string, { label: string; color: string }> = {
-  success: { label: "正常",   color: "#10b981" },
-  error:   { label: "失败",   color: "#ef4444" },
-  fetching:{ label: "拉取中", color: "#f59e0b" },
-};
 
 function fmtTime(t: string | null) {
   if (!t) return "从未拉取";
@@ -84,10 +79,9 @@ onMounted(load);
         <div v-for="sub in list" :key="sub.id" class="sub-card">
           <div class="sub-head">
             <span class="sub-name">{{ sub.name }}</span>
-            <span v-if="sub.fetchStatus" class="sub-status"
-              :style="{ color: STATUS[sub.fetchStatus]?.color ?? '#999' }">
-              <span class="status-dot" :style="{ background: STATUS[sub.fetchStatus]?.color ?? '#999' }"></span>
-              {{ STATUS[sub.fetchStatus]?.label ?? sub.fetchStatus }}
+            <span class="sub-status" :style="{ color: fetchStatusMeta(sub.fetchStatus).color }">
+              <span class="status-dot" :style="{ background: fetchStatusMeta(sub.fetchStatus).color }"></span>
+              {{ fetchStatusMeta(sub.fetchStatus).label }}
             </span>
           </div>
 
@@ -115,7 +109,14 @@ onMounted(load);
       </div>
     </a-spin>
 
-    <a-modal v-model:visible="modalVisible" :title="editing ? '编辑订阅源' : '添加订阅源'" @ok="submitForm" :ok-loading="submitting">
+    <a-modal
+      v-model:visible="modalVisible"
+      :title="editing ? '编辑订阅源' : '添加订阅源'"
+      :width="460"
+      :ok-loading="submitting"
+      ok-text="保存"
+      @ok="submitForm"
+    >
       <a-form :model="form" layout="vertical">
         <a-form-item label="名称"><a-input v-model="form.name" placeholder="机场A" /></a-form-item>
         <a-form-item label="订阅地址"><a-input v-model="form.url" placeholder="https://..." /></a-form-item>

@@ -64,6 +64,10 @@ body {
   height: 100%;
   background: var(--color-bg-2);
 }
+/* 永远预留纵向滚动条位置，避免不同页面有/无滚动条导致切换时宽度跳动 */
+html {
+  scrollbar-gutter: stable;
+}
 
 #app {
   width: 100%;

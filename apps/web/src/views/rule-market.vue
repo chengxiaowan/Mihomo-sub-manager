@@ -1,221 +1,345 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { Message, Modal } from "@arco-design/web-vue";
 import { ruleTemplateApi, type RuleTemplate, type RuleTemplateItem } from "@/api/rule-templates";
 import { profileApi, type Profile } from "@/api/profiles";
 import { groupApi, type ProxyGroup } from "@/api/groups";
 
+const RULE_TYPES = ["DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6", "GEOIP", "PROCESS-NAME"];
+const BUILTIN_POLICIES = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
+
+// ── 列表（左栏） ──────────────────────────────────────────────
 const list = ref<RuleTemplate[]>([]);
 const loading = ref(false);
+const search = ref("");
+const selectedId = ref<string | null>(null);
 
-// 新建/编辑模板
-const modalVisible = ref(false);
-const editing = ref<RuleTemplate | null>(null);
-const form = ref({ name: "", description: "" });
-const submitting = ref(false);
+const filteredList = computed(() => {
+  const kw = search.value.trim().toLowerCase();
+  return kw ? list.value.filter((t) => t.name.toLowerCase().includes(kw)) : list.value;
+});
 
-// 编辑条目
-const itemsVisible = ref(false);
-const currentTemplate = ref<RuleTemplate | null>(null);
+// ── 详情（右栏） ──────────────────────────────────────────────
+const detail = ref<RuleTemplate | null>(null);
+const detailLoading = ref(false);
+const activeTab = ref("info");
+
+const infoForm = ref({ name: "", description: "" });
+const infoSaving = ref(false);
+
 const items = ref<RuleTemplateItem[]>([]);
-const itemsLoading = ref(false);
 const newItemType = ref("DOMAIN-SUFFIX");
 const newItemValue = ref("");
 const itemsSaving = ref(false);
 
-const RULE_TYPES = ["DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6", "GEOIP", "PROCESS-NAME"];
+// ── 新建模板抽屉 ──────────────────────────────────────────────
+const createVisible = ref(false);
+const createForm = ref({ name: "", description: "" });
+const creating = ref(false);
 
-// 导入到 Profile
+// ── 导入抽屉 ──────────────────────────────────────────────────
 const importVisible = ref(false);
-const importTemplate = ref<RuleTemplate | null>(null);
 const allProfiles = ref<Profile[]>([]);
 const importProfileId = ref("");
 const importPolicy = ref("");
 const importMode = ref<"append" | "overwrite">("append");
+const importForm = ref({}); // a-form 占位 model（字段用各自 ref 双向绑定）
 const importLoading = ref(false);
 const importSaving = ref(false);
-
 const profileGroups = ref<ProxyGroup[]>([]);
-const BUILTIN_POLICIES = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
+
+function patchListItem(id: string, patch: Partial<RuleTemplate>) {
+  const t = list.value.find((x) => x.id === id);
+  if (t) Object.assign(t, patch);
+}
 
 async function load() {
   loading.value = true;
-  try { list.value = await ruleTemplateApi.list(); }
-  finally { loading.value = false; }
+  try {
+    list.value = await ruleTemplateApi.list();
+    if (list.value.length) {
+      const stillExists = list.value.some((t) => t.id === selectedId.value);
+      await selectTemplate(stillExists ? selectedId.value! : list.value[0].id);
+    } else {
+      selectedId.value = null;
+      detail.value = null;
+    }
+  } finally {
+    loading.value = false;
+  }
 }
 
-function openCreate() {
-  editing.value = null; form.value = { name: "", description: "" }; modalVisible.value = true;
-}
-function openEdit(t: RuleTemplate) {
-  editing.value = t; form.value = { name: t.name, description: t.description ?? "" }; modalVisible.value = true;
-}
-async function submitForm() {
-  if (!form.value.name.trim()) { Message.warning("请填写模板名称"); return; }
-  submitting.value = true;
+async function selectTemplate(id: string) {
+  selectedId.value = id;
+  detailLoading.value = true;
+  newItemType.value = "DOMAIN-SUFFIX";
+  newItemValue.value = "";
   try {
-    editing.value
-      ? await ruleTemplateApi.update(editing.value.id, form.value)
-      : await ruleTemplateApi.create(form.value);
-    Message.success(editing.value ? "已更新" : "已创建");
-    modalVisible.value = false; await load();
-  } finally { submitting.value = false; }
-}
-function confirmDelete(t: RuleTemplate) {
-  Modal.confirm({
-    title: `删除「${t.name}」？`, content: "删除后无法恢复。",
-    okText: "确认删除", okButtonProps: { status: "danger" },
-    onOk: async () => { await ruleTemplateApi.remove(t.id); Message.success("已删除"); await load(); },
-  });
+    const d = await ruleTemplateApi.get(id);
+    detail.value = d;
+    infoForm.value = { name: d.name, description: d.description ?? "" };
+    items.value = d.items ?? [];
+  } finally {
+    detailLoading.value = false;
+  }
 }
 
-// 编辑条目
-async function openItems(t: RuleTemplate) {
-  currentTemplate.value = t; itemsVisible.value = true; itemsLoading.value = true;
-  newItemType.value = "DOMAIN-SUFFIX"; newItemValue.value = "";
+async function saveInfo() {
+  if (!detail.value) return;
+  if (!infoForm.value.name.trim()) {
+    Message.warning("请填写模板名称");
+    return;
+  }
+  infoSaving.value = true;
   try {
-    const detail = await ruleTemplateApi.get(t.id);
-    items.value = detail.items ?? [];
-  } finally { itemsLoading.value = false; }
+    const updated = await ruleTemplateApi.update(detail.value.id, {
+      name: infoForm.value.name,
+      description: infoForm.value.description,
+    });
+    detail.value = { ...detail.value, ...updated, items: items.value };
+    patchListItem(detail.value.id, { name: updated.name, description: updated.description });
+    Message.success("已保存");
+  } finally {
+    infoSaving.value = false;
+  }
+}
+
+async function persistItems(next: RuleTemplateItem[]) {
+  itemsSaving.value = true;
+  try {
+    await ruleTemplateApi.update(detail.value!.id, {
+      items: next.map((i) => ({ type: i.type, value: i.value ?? "" })),
+    });
+    const d = await ruleTemplateApi.get(detail.value!.id);
+    items.value = d.items ?? [];
+    patchListItem(detail.value!.id, { _count: { items: items.value.length } });
+  } finally {
+    itemsSaving.value = false;
+  }
 }
 
 async function addItem() {
-  if (!newItemValue.value.trim()) { Message.warning("请填写匹配值"); return; }
-  const newItems = [...items.value, { id: "", type: newItemType.value, value: newItemValue.value, sort: items.value.length, templateId: currentTemplate.value!.id }];
-  itemsSaving.value = true;
-  try {
-    await ruleTemplateApi.update(currentTemplate.value!.id, {
-      items: newItems.map((i) => ({ type: i.type, value: i.value ?? "" })),
-    });
-    const detail = await ruleTemplateApi.get(currentTemplate.value!.id);
-    items.value = detail.items ?? [];
-    newItemValue.value = "";
-    await load();
-  } finally { itemsSaving.value = false; }
+  if (!newItemValue.value.trim()) {
+    Message.warning("请填写匹配值");
+    return;
+  }
+  await persistItems([
+    ...items.value,
+    { id: "", type: newItemType.value, value: newItemValue.value, sort: items.value.length, templateId: detail.value!.id },
+  ]);
+  newItemValue.value = "";
 }
 
 async function removeItem(item: RuleTemplateItem) {
-  const newItems = items.value.filter((i) => i.id !== item.id);
-  itemsSaving.value = true;
-  try {
-    await ruleTemplateApi.update(currentTemplate.value!.id, {
-      items: newItems.map((i) => ({ type: i.type, value: i.value ?? "" })),
-    });
-    items.value = newItems;
-    await load();
-  } finally { itemsSaving.value = false; }
+  await persistItems(items.value.filter((i) => i.id !== item.id));
 }
 
-// 导入到 Profile
-async function openImport(t: RuleTemplate) {
-  importTemplate.value = t; importVisible.value = true; importLoading.value = true;
-  importMode.value = "append"; importPolicy.value = ""; importProfileId.value = ""; profileGroups.value = [];
+function confirmDelete() {
+  if (!detail.value) return;
+  const t = detail.value;
+  Modal.confirm({
+    title: `删除「${t.name}」？`,
+    content: "删除后无法恢复。",
+    okText: "确认删除",
+    okButtonProps: { status: "danger" },
+    onOk: async () => {
+      await ruleTemplateApi.remove(t.id);
+      Message.success("已删除");
+      await load();
+    },
+  });
+}
+
+function openCreate() {
+  createForm.value = { name: "", description: "" };
+  createVisible.value = true;
+}
+async function submitCreate() {
+  if (!createForm.value.name.trim()) {
+    Message.warning("请填写模板名称");
+    return;
+  }
+  creating.value = true;
+  try {
+    const created = await ruleTemplateApi.create(createForm.value);
+    createVisible.value = false;
+    Message.success("已创建");
+    list.value = await ruleTemplateApi.list();
+    await selectTemplate(created.id);
+    activeTab.value = "info";
+  } finally {
+    creating.value = false;
+  }
+}
+
+// 导入
+async function openImport() {
+  if (!detail.value) return;
+  importVisible.value = true;
+  importLoading.value = true;
+  importMode.value = "append";
+  importPolicy.value = "";
+  importProfileId.value = "";
+  profileGroups.value = [];
   try {
     allProfiles.value = await profileApi.list();
-  } finally { importLoading.value = false; }
+  } finally {
+    importLoading.value = false;
+  }
 }
-
 async function onProfileChange(id: unknown) {
   const profileId = String(id);
-  importProfileId.value = profileId; importPolicy.value = "";
-  if (!profileId) { profileGroups.value = []; return; }
-  const [detail, groups] = await Promise.all([profileApi.get(profileId), groupApi.list()]);
-  const boundIds = new Set((detail.groups ?? []).map((g) => g.id));
+  importProfileId.value = profileId;
+  importPolicy.value = "";
+  if (!profileId) {
+    profileGroups.value = [];
+    return;
+  }
+  const [d, groups] = await Promise.all([profileApi.get(profileId), groupApi.list()]);
+  const boundIds = new Set((d.groups ?? []).map((g) => g.id));
   profileGroups.value = groups.filter((g) => boundIds.has(g.id));
 }
-
 async function doImport() {
-  if (!importProfileId.value || !importPolicy.value) { Message.warning("请选择配置方案和去向"); return; }
+  if (!detail.value) return;
+  if (!importProfileId.value || !importPolicy.value) {
+    Message.warning("请选择配置方案和去向");
+    return;
+  }
   importSaving.value = true;
   try {
-    const r = await ruleTemplateApi.import(importTemplate.value!.id, {
+    const r = await ruleTemplateApi.import(detail.value.id, {
       profileId: importProfileId.value,
       policy: importPolicy.value,
       mode: importMode.value,
     });
     Message.success(`已导入 ${r.imported} 条规则`);
     importVisible.value = false;
-  } finally { importSaving.value = false; }
+  } finally {
+    importSaving.value = false;
+  }
 }
 
 onMounted(load);
 </script>
 
 <template>
-  <div>
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">规则市场</h2>
-        <p class="page-desc">管理规则模板，一键导入到配置方案</p>
-      </div>
-      <a-button type="primary" @click="openCreate">
-        <template #icon><icon-plus /></template>新建模板
-      </a-button>
-    </div>
-
-    <a-spin :loading="loading" style="display:block;width:100%">
-      <div class="market-grid">
-        <div v-for="t in list" :key="t.id" class="market-card">
-          <div class="card-head">
-            <span class="card-name">{{ t.name }}</span>
-            <span class="card-count">{{ t._count?.items ?? 0 }} 条</span>
+  <div class="md-shell">
+    <!-- 左栏 -->
+    <aside class="md-aside">
+      <a-input v-model="search" placeholder="搜索模板..." allow-clear class="aside-search">
+        <template #prefix><icon-search /></template>
+      </a-input>
+      <a-spin :loading="loading" style="display:block;flex:1;min-height:0">
+        <div class="md-list">
+          <div
+            v-for="t in filteredList" :key="t.id"
+            class="md-item" :class="{ active: t.id === selectedId }"
+            @click="selectTemplate(t.id)"
+          >
+            <icon-storage class="pi-icon" />
+            <div class="pi-main">
+              <span class="pi-name">{{ t.name }}</span>
+              <span class="pi-sub">{{ t._count?.items ?? 0 }} 条规则</span>
+            </div>
           </div>
-          <p class="card-desc">{{ t.description || "暂无描述" }}</p>
-          <div class="card-foot">
-            <a-button size="small" type="primary" @click="openImport(t)">
-              <template #icon><icon-download /></template>导入
-            </a-button>
-            <a-button size="small" @click="openItems(t)">
-              <template #icon><icon-edit /></template>编辑条目
-            </a-button>
-            <a-button size="small" @click="openEdit(t)"><template #icon><icon-settings /></template></a-button>
-            <a-button size="small" status="danger" @click="confirmDelete(t)"><template #icon><icon-delete /></template></a-button>
-          </div>
-        </div>
-        <div v-if="!loading && list.length === 0" class="market-empty">
-          <icon-storage style="font-size:36px;color:#ccc;margin-bottom:12px" />
-          <p>还没有规则模板，点击右上角新建</p>
-        </div>
-      </div>
-    </a-spin>
-
-    <!-- 新建/编辑模板 -->
-    <a-modal v-model:visible="modalVisible" :title="editing ? '编辑模板' : '新建规则模板'" @ok="submitForm" :ok-loading="submitting">
-      <a-form :model="form" layout="vertical">
-        <a-form-item label="模板名称"><a-input v-model="form.name" placeholder="AI规则" /></a-form-item>
-        <a-form-item label="描述"><a-input v-model="form.description" placeholder="OpenAI、Claude 等 AI 服务" /></a-form-item>
-      </a-form>
-    </a-modal>
-
-    <!-- 编辑条目 -->
-    <a-modal v-model:visible="itemsVisible" :title="`编辑条目 — ${currentTemplate?.name}`" width="600px" :footer="false">
-      <a-spin :loading="itemsLoading" style="display:block">
-        <div class="add-item-row">
-          <a-select v-model="newItemType" style="width:160px">
-            <a-option v-for="t in RULE_TYPES" :key="t" :value="t">{{ t }}</a-option>
-          </a-select>
-          <a-input v-model="newItemValue" placeholder="openai.com" style="flex:1" @press-enter="addItem" />
-          <a-button type="primary" :loading="itemsSaving" @click="addItem">
-            <template #icon><icon-plus /></template>添加
-          </a-button>
-        </div>
-        <div class="items-list">
-          <div v-if="!itemsLoading && items.length === 0" class="items-empty">还没有条目</div>
-          <div v-for="item in items" :key="item.id" class="item-row">
-            <span class="item-type">{{ item.type }}</span>
-            <span class="item-value">{{ item.value }}</span>
-            <a-button size="mini" status="danger" :loading="itemsSaving" @click="removeItem(item)">
-              <template #icon><icon-delete /></template>
-            </a-button>
+          <div v-if="!loading && filteredList.length === 0" class="aside-empty">
+            {{ search ? "无匹配模板" : "还没有模板" }}
           </div>
         </div>
       </a-spin>
+      <a-button long type="outline" class="aside-create" @click="openCreate">
+        <template #icon><icon-plus /></template>新建模板
+      </a-button>
+    </aside>
+
+    <!-- 右栏 -->
+    <section class="md-detail">
+      <div v-if="!detail" class="detail-empty">
+        <icon-storage style="font-size:40px;color:#ccc;margin-bottom:12px" />
+        <p>{{ loading ? "加载中..." : "选择或新建一个规则模板" }}</p>
+      </div>
+
+      <a-spin v-else :loading="detailLoading" style="display:block;width:100%">
+        <div class="detail-header">
+          <div class="dh-left">
+            <h2 class="dh-name">{{ detail.name }}</h2>
+            <p class="dh-summary">{{ items.length }} 条规则条目</p>
+          </div>
+          <div class="dh-right">
+            <a-button type="primary" @click="openImport">
+              <template #icon><icon-download /></template>导入到方案
+            </a-button>
+            <a-button status="danger" @click="confirmDelete">
+              <template #icon><icon-delete /></template>删除
+            </a-button>
+          </div>
+        </div>
+
+        <a-tabs v-model:active-key="activeTab" class="detail-tabs">
+          <!-- 信息 -->
+          <a-tab-pane key="info" title="信息">
+            <a-form :model="infoForm" layout="vertical" class="tab-form">
+              <a-form-item label="模板名称">
+                <a-input v-model="infoForm.name" placeholder="AI规则" />
+              </a-form-item>
+              <a-form-item label="描述">
+                <a-input v-model="infoForm.description" placeholder="OpenAI、Claude 等 AI 服务" />
+              </a-form-item>
+              <a-button type="primary" :loading="infoSaving" @click="saveInfo">保存</a-button>
+            </a-form>
+          </a-tab-pane>
+
+          <!-- 条目 -->
+          <a-tab-pane key="items" title="条目">
+            <div class="add-item-row">
+              <a-select v-model="newItemType" style="width:160px">
+                <a-option v-for="t in RULE_TYPES" :key="t" :value="t">{{ t }}</a-option>
+              </a-select>
+              <a-input v-model="newItemValue" placeholder="openai.com" style="flex:1" @press-enter="addItem" />
+              <a-button type="primary" :loading="itemsSaving" @click="addItem">
+                <template #icon><icon-plus /></template>添加
+              </a-button>
+            </div>
+            <div class="items-list">
+              <div v-if="items.length === 0" class="items-empty">还没有条目</div>
+              <div v-for="item in items" :key="item.id" class="item-row">
+                <span class="item-type">{{ item.type }}</span>
+                <span class="item-value">{{ item.value }}</span>
+                <a-button size="mini" status="danger" :loading="itemsSaving" @click="removeItem(item)">
+                  <template #icon><icon-delete /></template>
+                </a-button>
+              </div>
+            </div>
+          </a-tab-pane>
+        </a-tabs>
+      </a-spin>
+    </section>
+
+    <!-- 新建模板抽屉 -->
+    <a-modal
+      v-model:visible="createVisible"
+      title="新建规则模板"
+      :width="460"
+      :ok-loading="creating"
+      ok-text="创建"
+      @ok="submitCreate"
+    >
+      <a-form :model="createForm" layout="vertical">
+        <a-form-item label="模板名称"><a-input v-model="createForm.name" placeholder="AI规则" /></a-form-item>
+        <a-form-item label="描述"><a-input v-model="createForm.description" placeholder="OpenAI、Claude 等 AI 服务" /></a-form-item>
+      </a-form>
     </a-modal>
 
-    <!-- 导入到 Profile -->
-    <a-modal v-model:visible="importVisible" :title="`导入「${importTemplate?.name}」`" @ok="doImport" :ok-loading="importSaving">
+    <!-- 导入到方案 -->
+    <a-modal
+      v-model:visible="importVisible"
+      :title="`导入「${detail?.name}」`"
+      :ok-loading="importSaving"
+      ok-text="导入"
+      @ok="doImport"
+    >
       <a-spin :loading="importLoading" style="display:block">
-        <a-form :model="form" layout="vertical">
+        <a-form :model="importForm" layout="vertical">
           <a-form-item label="目标配置方案">
             <a-select :model-value="importProfileId" placeholder="选择配置方案" @change="onProfileChange">
               <a-option v-for="p in allProfiles" :key="p.id" :value="p.id">{{ p.name }}</a-option>
@@ -247,39 +371,77 @@ onMounted(load);
 </template>
 
 <style scoped lang="less">
-.page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; }
-.page-title { font-size:20px; font-weight:700; margin:0 0 4px; }
-.page-desc { margin:0; font-size:13px; color:var(--color-text-3); }
-
-.market-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
-
-.market-card {
-  background:var(--color-bg-1); border:1px solid var(--color-border-2);
-  border-radius:12px; padding:18px 20px;
-  display:flex; flex-direction:column; gap:10px;
-  transition:box-shadow .18s;
-  &:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); }
-}
-.card-head { display:flex; align-items:center; justify-content:space-between; }
-.card-name { font-size:15px; font-weight:700; }
-.card-count { font-size:12px; color:var(--color-text-3); background:var(--color-fill-2); padding:2px 8px; border-radius:10px; }
-.card-desc { margin:0; font-size:12px; color:var(--color-text-3); }
-.card-foot { display:flex; gap:6px; padding-top:8px; border-top:1px solid var(--color-border-2); flex-wrap:wrap; }
-
-.market-empty {
-  grid-column:1/-1; display:flex; flex-direction:column; align-items:center;
-  padding:60px 0; color:var(--color-text-3); font-size:14px;
+.md-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+  align-items: start;
 }
 
-.add-item-row { display:flex; gap:8px; margin-bottom:12px; }
-.items-list { display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto; }
-.items-empty { padding:30px; text-align:center; color:var(--color-text-3); font-size:13px; }
+/* 左栏 */
+.md-aside {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: calc(100vh - 140px);
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 14px;
+  padding: 14px;
+}
+.aside-search { flex: 0 0 auto; }
+.md-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.md-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 9px; cursor: pointer;
+  border: 1px solid transparent; transition: background .15s;
+  &:hover { background: var(--color-fill-2); }
+  &.active { background: var(--color-fill-2); border-color: var(--color-border-2); }
+}
+.pi-icon { font-size: 16px; color: var(--color-text-3); flex-shrink: 0; }
+.pi-main { display: flex; flex-direction: column; min-width: 0; }
+.pi-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-sub { font-size: 11px; color: var(--color-text-3); }
+.aside-empty { padding: 30px 0; text-align: center; color: var(--color-text-3); font-size: 13px; }
+.aside-create { flex: 0 0 auto; }
+
+/* 右栏 */
+.md-detail {
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 14px;
+  padding: 22px 24px;
+  min-height: calc(100vh - 140px);
+}
+.detail-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 120px 0; color: var(--color-text-3); font-size: 14px;
+}
+.detail-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding-bottom: 16px; border-bottom: 1px solid var(--color-border-2);
+}
+.dh-name { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+.dh-summary { margin: 0; font-size: 13px; color: var(--color-text-3); }
+.dh-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.detail-tabs { margin-top: 8px; }
+.tab-form { max-width: 760px; }
+
+.add-item-row { display: flex; gap: 8px; margin-bottom: 12px; max-width: 760px; }
+.items-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; }
+.items-empty { padding: 30px; text-align: center; color: var(--color-text-3); font-size: 13px; }
 .item-row {
-  display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px;
-  &:hover { background:var(--color-fill-2); }
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px;
+  &:hover { background: var(--color-fill-2); }
 }
-.item-type { font-size:11px; font-weight:700; color:#4080ff; background:#eff6ff; padding:2px 7px; border-radius:5px; flex-shrink:0; }
-.item-value { flex:1; font-size:13px; }
+.item-type { font-size: 11px; font-weight: 700; color: #1668dc; background: #1668dc1a; padding: 2px 7px; border-radius: 5px; flex-shrink: 0; }
+.item-value { flex: 1; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-body:not([arco-theme="dark"]) .market-card { background:#fff; }
+@media (max-width: 900px) {
+  .md-shell { grid-template-columns: 1fr; }
+  .md-aside { position: static; height: auto; max-height: 320px; }
+}
 </style>

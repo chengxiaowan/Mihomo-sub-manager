@@ -2,21 +2,18 @@
 import { ref, onMounted } from "vue";
 import { Message, Modal } from "@arco-design/web-vue";
 import { nodeApi, type ProxyNode } from "@/api/nodes";
+import { nodeTypeColor } from "@/utils/badges";
 
 const items = ref<ProxyNode[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const filters = ref({ keyword: "", type: "", page: 1, pageSize: 30 });
 
-const TYPE_COLOR: Record<string, { color: string; bg: string }> = {
-  vmess:  { color: "#1677ff", bg: "#e6f4ff" },
-  vless:  { color: "#722ed1", bg: "#f9f0ff" },
-  trojan: { color: "#d46b08", bg: "#fff7e6" },
-  ss:     { color: "#389e0d", bg: "#f6ffed" },
-};
+const TYPE_OPTIONS = ["vmess", "vless", "trojan", "ss", "ssr", "http"];
 
 function typeStyle(type: string) {
-  return TYPE_COLOR[type] ?? { color: "#595959", bg: "#f5f5f5" };
+  const color = nodeTypeColor(type);
+  return { color, bg: `${color}1a` }; // 同色 10% 透明底
 }
 
 
@@ -70,7 +67,7 @@ onMounted(load);
           @clear="onSearch"
         />
         <a-select v-model="filters.type" placeholder="协议" style="width:120px" allow-clear @change="onSearch">
-          <a-option v-for="t in ['vmess','vless','trojan','ss']" :key="t" :value="t">{{ t }}</a-option>
+          <a-option v-for="t in TYPE_OPTIONS" :key="t" :value="t">{{ t }}</a-option>
         </a-select>
       </div>
     </div>
