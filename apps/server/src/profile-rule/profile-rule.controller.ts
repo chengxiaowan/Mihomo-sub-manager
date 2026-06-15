@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProfileRuleService } from './profile-rule.service';
 import { CreateProfileRuleDto } from './dto/create-profile-rule.dto';
@@ -17,7 +27,10 @@ export class ProfileRuleController {
 
   @Post()
   @ApiOperation({ summary: '添加规则' })
-  create(@Param('profileId') profileId: string, @Body() dto: CreateProfileRuleDto) {
+  create(
+    @Param('profileId') profileId: string,
+    @Body() dto: CreateProfileRuleDto,
+  ) {
     return this.service.create(profileId, dto);
   }
 
@@ -40,7 +53,10 @@ export class ProfileRuleController {
 
   @Put('reorder')
   @ApiOperation({ summary: '重新排序规则' })
-  reorder(@Param('profileId') profileId: string, @Body() dto: ReorderProfileRulesDto) {
+  reorder(
+    @Param('profileId') profileId: string,
+    @Body() dto: ReorderProfileRulesDto,
+  ) {
     return this.service.reorder(profileId, dto);
   }
 }

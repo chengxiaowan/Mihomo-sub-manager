@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProfileRuleDto } from './dto/create-profile-rule.dto';
 import { ReorderProfileRulesDto } from './dto/reorder-profile-rules.dto';
@@ -28,7 +32,11 @@ export class ProfileRuleService {
     });
   }
 
-  async update(profileId: string, id: string, dto: Partial<CreateProfileRuleDto>) {
+  async update(
+    profileId: string,
+    id: string,
+    dto: Partial<CreateProfileRuleDto>,
+  ) {
     await this.findOne(profileId, id);
     return this.prisma.profileRule.update({ where: { id }, data: dto });
   }
@@ -48,14 +56,22 @@ export class ProfileRuleService {
     }
     await this.prisma.$transaction(
       dto.ids.map((id, index) =>
-        this.prisma.profileRule.update({ where: { id }, data: { sort: index } }),
+        this.prisma.profileRule.update({
+          where: { id },
+          data: { sort: index },
+        }),
       ),
     );
   }
 
   private async findOne(profileId: string, id: string) {
-    const rule = await this.prisma.profileRule.findFirst({ where: { id, profileId } });
-    if (!rule) throw new NotFoundException(`Rule ${id} not found in profile ${profileId}`);
+    const rule = await this.prisma.profileRule.findFirst({
+      where: { id, profileId },
+    });
+    if (!rule)
+      throw new NotFoundException(
+        `Rule ${id} not found in profile ${profileId}`,
+      );
     return rule;
   }
 }

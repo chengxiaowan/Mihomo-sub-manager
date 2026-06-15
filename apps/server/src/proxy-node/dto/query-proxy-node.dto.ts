@@ -1,12 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsInt,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class QueryProxyNodeDto {
   @ApiPropertyOptional({ description: '关键词，匹配节点名称或服务器地址' })
@@ -31,7 +25,7 @@ export class QueryProxyNodeDto {
 
   @ApiPropertyOptional({ description: '是否启用', type: Boolean })
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (value === 'true') return true;
     if (value === 'false') return false;
     return value;

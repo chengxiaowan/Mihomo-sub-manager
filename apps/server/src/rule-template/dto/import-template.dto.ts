@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 
 export class ImportTemplateDto {
   @ApiProperty({ description: '导入到哪个 Profile' })
@@ -10,7 +10,10 @@ export class ImportTemplateDto {
   @IsString()
   policy: string;
 
-  @ApiProperty({ description: '导入模式：append 追加 / overwrite 覆盖同策略规则', enum: ['append', 'overwrite'] })
+  @ApiProperty({
+    description: '导入模式：append 追加 / overwrite 覆盖同策略规则',
+    enum: ['append', 'overwrite'],
+  })
   @IsString()
   mode: 'append' | 'overwrite';
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { dump as yamlDump } from 'js-yaml';
 import { ProfileService } from '../profile/profile.service';
+import { normalizeBaseConfig, type BaseConfig } from '../profile/base-config';
 
 const TEST_URL = 'http://www.gstatic.com/generate_204';
 const TEST_INTERVAL = 300;
@@ -51,7 +52,14 @@ export class GeneratorService {
     // 追加 MATCH 兜底规则
     rules.push(`MATCH,${profile.defaultPolicy}`);
 
+    // 通用配置（mixed-port / dns 等）展开到 YAML 顶层；
+    // 归一化保证即使存量数据为 null 或部分对象也补齐完整默认值
+    const base = normalizeBaseConfig(
+      profile.baseConfig as Partial<BaseConfig> | null,
+    );
+
     const doc: Record<string, unknown> = {
+      ...base,
       proxies,
       'proxy-groups': proxyGroups,
       rules,

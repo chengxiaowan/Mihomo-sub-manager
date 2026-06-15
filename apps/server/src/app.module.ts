@@ -27,8 +27,6 @@ import { PublishModule } from './publish/publish.module';
     PublishModule,
   ],
   controllers: [AppController],
-  providers: [
-    { provide: APP_GUARD, useClass: ApiKeyGuard },
-  ],
+  providers: [{ provide: APP_GUARD, useClass: ApiKeyGuard }],
 })
 export class AppModule {}

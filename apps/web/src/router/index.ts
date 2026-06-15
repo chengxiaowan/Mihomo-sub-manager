@@ -38,6 +38,11 @@ const routes = [
         name: "RuleMarket",
         component: () => import("@/views/rule-market.vue"),
       },
+      {
+        path: "logs",
+        name: "OperationLogs",
+        component: () => import("@/views/operation-logs.vue"),
+      },
       { path: ":pathMatch(.*)*", redirect: "/subscriptions" },
     ],
   },

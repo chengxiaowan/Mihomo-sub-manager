@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsObject, IsOptional, IsString } from 'class-validator';
+import type { BaseConfig } from '../base-config';
 
 export class CreateProfileDto {
   @ApiProperty({ description: '方案名称' })
@@ -11,8 +12,16 @@ export class CreateProfileDto {
   @IsBoolean()
   enabled?: boolean;
 
-  @ApiPropertyOptional({ description: '兜底策略，用于 MATCH 规则，默认 DIRECT', default: 'DIRECT' })
+  @ApiPropertyOptional({
+    description: '兜底策略，用于 MATCH 规则，默认 DIRECT',
+    default: 'DIRECT',
+  })
   @IsOptional()
   @IsString()
   defaultPolicy?: string;
+
+  @ApiPropertyOptional({ description: 'Mihomo 通用配置（general + dns）' })
+  @IsOptional()
+  @IsObject()
+  baseConfig?: BaseConfig;
 }

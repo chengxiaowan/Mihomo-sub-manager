@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { Message, Modal } from "@arco-design/web-vue";
-import { profileApi, type Profile } from "@/api/profiles";
+import { profileApi, defaultBaseConfig, type Profile, type BaseConfig } from "@/api/profiles";
 import { groupApi, type ProxyGroup } from "@/api/groups";
 import { profileRuleApi, type ProfileRule } from "@/api/profile-rules";
 import { useConfigStore } from "@/stores/config";
@@ -33,6 +33,16 @@ const ruleFormVisible = ref(false);
 
 const RULE_TYPES = ["DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6", "GEOIP", "PROCESS-NAME"];
 const BUILTIN_POLICIES = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
+
+const MODE_OPTIONS = ["rule", "global", "direct"];
+const LOG_LEVEL_OPTIONS = ["silent", "error", "warning", "info", "debug"];
+const ENHANCED_MODE_OPTIONS = ["fake-ip", "redir-host"];
+
+const baseVisible = ref(false);
+const baseProfile = ref<Profile | null>(null);
+const baseForm = ref<BaseConfig>(defaultBaseConfig());
+const baseLoading = ref(false);
+const baseSaving = ref(false);
 
 const boundGroups = computed(() =>
   allGroups.value.filter((g) => bindGroupIds.value.includes(g.id))
@@ -83,6 +93,27 @@ function regenerateToken(p: Profile) {
       Message.success("Token 已更新");
     },
   });
+}
+
+async function openBaseConfig(p: Profile) {
+  baseProfile.value = p; baseVisible.value = true; baseLoading.value = true;
+  try {
+    const detail = await profileApi.get(p.id);
+    baseForm.value = detail.baseConfig
+      ? { ...defaultBaseConfig(), ...detail.baseConfig, dns: { ...defaultBaseConfig().dns, ...detail.baseConfig.dns } }
+      : defaultBaseConfig();
+  } finally { baseLoading.value = false; }
+}
+function resetBaseConfig() {
+  baseForm.value = defaultBaseConfig();
+}
+async function saveBaseConfig() {
+  if (!baseProfile.value) return;
+  baseSaving.value = true;
+  try {
+    await profileApi.update(baseProfile.value.id, { baseConfig: baseForm.value });
+    Message.success("基础设置已保存"); baseVisible.value = false;
+  } finally { baseSaving.value = false; }
 }
 
 async function openBind(p: Profile) {
@@ -186,6 +217,7 @@ onMounted(load);
             <div class="profile-actions">
               <a-button size="small" @click="openBind(p)"><template #icon><icon-layers /></template>绑定代理组</a-button>
               <a-button size="small" @click="openRules(p)"><template #icon><icon-filter /></template>管理规则</a-button>
+              <a-button size="small" @click="openBaseConfig(p)"><template #icon><icon-settings /></template>基础设置</a-button>
               <a-button size="small" @click="openEdit(p)"><template #icon><icon-edit /></template></a-button>
               <a-button size="small" @click="regenerateToken(p)"><template #icon><icon-refresh /></template></a-button>
               <a-button size="small" status="danger" @click="confirmDelete(p)"><template #icon><icon-delete /></template></a-button>
@@ -278,6 +310,94 @@ onMounted(load);
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 基础设置 -->
+    <a-modal
+      v-model:visible="baseVisible"
+      :title="`基础设置 — ${baseProfile?.name}`"
+      width="640px"
+      @ok="saveBaseConfig"
+      :ok-loading="baseSaving"
+    >
+      <template #title-extra>
+        <a-button size="mini" @click="resetBaseConfig">恢复默认</a-button>
+      </template>
+      <a-spin :loading="baseLoading" style="display:block;width:100%">
+        <a-form :model="baseForm" layout="vertical">
+          <div class="base-section-title">通用</div>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="混合端口 (mixed-port)">
+                <a-input-number v-model="baseForm['mixed-port']" :min="1" :max="65535" style="width:100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="外部控制器 (external-controller)">
+                <a-input v-model="baseForm['external-controller']" placeholder="127.0.0.1:9090" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="运行模式 (mode)">
+                <a-select v-model="baseForm.mode">
+                  <a-option v-for="m in MODE_OPTIONS" :key="m" :value="m">{{ m }}</a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="日志级别 (log-level)">
+                <a-select v-model="baseForm['log-level']">
+                  <a-option v-for="l in LOG_LEVEL_OPTIONS" :key="l" :value="l">{{ l }}</a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="监听地址 (bind-address)">
+                <a-input v-model="baseForm['bind-address']" placeholder="*" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="允许局域网 (allow-lan)">
+                <a-switch v-model="baseForm['allow-lan']" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <div class="base-section-title">DNS</div>
+          <a-row :gutter="16">
+            <a-col :span="8">
+              <a-form-item label="启用 (enable)"><a-switch v-model="baseForm.dns.enable" /></a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="IPv6"><a-switch v-model="baseForm.dns.ipv6" /></a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="使用 hosts (use-hosts)"><a-switch v-model="baseForm.dns['use-hosts']" /></a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="增强模式 (enhanced-mode)">
+                <a-select v-model="baseForm.dns['enhanced-mode']">
+                  <a-option v-for="e in ENHANCED_MODE_OPTIONS" :key="e" :value="e">{{ e }}</a-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="Fake-IP 网段 (fake-ip-range)">
+                <a-input v-model="baseForm.dns['fake-ip-range']" placeholder="198.18.0.1/16" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="默认 DNS (default-nameserver)">
+            <a-input-tag v-model="baseForm.dns['default-nameserver']" placeholder="回车添加，纯 IP" allow-clear />
+          </a-form-item>
+          <a-form-item label="DNS 服务器 (nameserver)">
+            <a-input-tag v-model="baseForm.dns.nameserver" placeholder="回车添加，支持 DoH" allow-clear />
+          </a-form-item>
+          <a-form-item label="代理节点 DNS (proxy-server-nameserver)">
+            <a-input-tag v-model="baseForm.dns['proxy-server-nameserver']" placeholder="回车添加，支持 DoH" allow-clear />
+          </a-form-item>
+        </a-form>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -337,6 +457,11 @@ onMounted(load);
 .rule-arrow { color:var(--color-text-3); flex-shrink:0; }
 .rule-policy { font-size:12px; font-weight:600; color:#059669; flex-shrink:0; min-width:60px; }
 .rule-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+
+.base-section-title {
+  font-size:13px; font-weight:700; color:var(--color-text-2);
+  margin:4px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--color-border-2);
+}
 
 body:not([arco-theme="dark"]) .profile-card { background:#fff; }
 body:not([arco-theme="dark"]) .bind-item.selected { background:#eff6ff; border-color:#bfdbfe; }

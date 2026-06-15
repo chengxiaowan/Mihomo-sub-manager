@@ -47,12 +47,33 @@ export class SubscriptionService {
 
   async update(id: string, dto: UpdateSubscriptionDto) {
     await this.findOne(id);
-    return this.prisma.subscriptionSource.update({ where: { id }, data: dto });
+    const source = await this.prisma.subscriptionSource.update({
+      where: { id },
+      data: dto,
+    });
+    this.opLog.record({
+      action: 'subscription.update',
+      entityType: 'SubscriptionSource',
+      entityId: id,
+      status: 'success',
+      message: `更新订阅源「${source.name}」`,
+    });
+    return source;
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    return this.prisma.subscriptionSource.delete({ where: { id } });
+    const existing = await this.findOne(id);
+    const source = await this.prisma.subscriptionSource.delete({
+      where: { id },
+    });
+    this.opLog.record({
+      action: 'subscription.remove',
+      entityType: 'SubscriptionSource',
+      entityId: id,
+      status: 'success',
+      message: `删除订阅源「${existing.name}」`,
+    });
+    return source;
   }
 
   async refresh(id: string) {

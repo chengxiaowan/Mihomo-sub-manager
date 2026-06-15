@@ -13,6 +13,7 @@ const navItems = [
   { key: "proxy-groups", label: "代理组", to: "/proxy-groups" },
   { key: "profiles", label: "配置方案", to: "/profiles" },
   { key: "rule-market", label: "规则市场", to: "/rule-market" },
+  { key: "logs", label: "操作日志", to: "/logs" },
 ];
 
 const isDark = ref(true);

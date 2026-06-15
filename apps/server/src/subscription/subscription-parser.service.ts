@@ -9,6 +9,21 @@ export interface ParsedNode {
   raw: Record<string, unknown>;
 }
 
+/** vmess:// 链接 base64 解码后的 JSON 结构（字段均为可选） */
+interface VmessJson {
+  id?: string;
+  aid?: string | number;
+  scy?: string;
+  net?: string;
+  tls?: string;
+  sni?: string;
+  path?: string;
+  host?: string;
+  ps?: string;
+  add?: string;
+  port?: string | number;
+}
+
 @Injectable()
 export class SubscriptionParserService {
   private readonly logger = new Logger(SubscriptionParserService.name);
@@ -72,12 +87,19 @@ export class SubscriptionParserService {
     const { name, type, server, port, ...rest } = p;
     if (!name || !type || !server || !port) throw new Error('缺少必要字段');
     return this.toParsedNode({
-      name: String(name),
-      type: String(type),
-      server: String(server),
+      name: this.toStr(name),
+      type: this.toStr(type),
+      server: this.toStr(server),
       port: Number(port),
       raw: rest,
     });
+  }
+
+  /** 把未知值安全转成字符串，避免对象触发 [object Object] */
+  private toStr(v: unknown): string {
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return '';
   }
 
   private parseUriLines(text: string): ParsedNode[] {
@@ -107,7 +129,9 @@ export class SubscriptionParserService {
 
   // ── vmess://base64(json) ─────────────────────────────────────────────────
   private parseVmess(uri: string): ParsedNode {
-    const j = JSON.parse(Buffer.from(uri.slice(8), 'base64').toString('utf-8'));
+    const j = JSON.parse(
+      Buffer.from(uri.slice(8), 'base64').toString('utf-8'),
+    ) as VmessJson;
     const raw: Record<string, unknown> = {
       uuid: j.id,
       alterId: Number(j.aid ?? 0),
@@ -127,9 +151,9 @@ export class SubscriptionParserService {
       raw['grpc-opts'] = { 'grpc-service-name': j.path || '' };
     if (net === 'h2') raw['h2-opts'] = { path: j.path || '/', host: [j.host] };
     return this.toParsedNode({
-      name: j.ps || j.add,
+      name: j.ps || j.add || '',
       type: 'vmess',
-      server: j.add,
+      server: j.add || '',
       port: Number(j.port),
       raw,
     });
