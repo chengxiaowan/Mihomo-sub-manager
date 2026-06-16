@@ -2,15 +2,27 @@
  * Mihomo 通用配置（general + dns）。
  * 以 Mihomo 原始键名（kebab-case）存储，generator 直接展开到 YAML 顶层。
  */
+export interface FallbackFilter {
+  geoip: boolean;
+  'geoip-code': string;
+  geosite: string[];
+  ipcidr: string[];
+  domain: string[];
+}
+
 export interface DnsConfig {
   enable: boolean;
   ipv6: boolean;
   'default-nameserver': string[];
   'enhanced-mode': string;
   'fake-ip-range': string;
+  'fake-ip-filter': string[];
   'use-hosts': boolean;
   nameserver: string[];
   'proxy-server-nameserver': string[];
+  'nameserver-policy': Record<string, string[]>;
+  fallback: string[];
+  'fallback-filter': FallbackFilter;
 }
 
 export interface BaseConfig {
@@ -47,7 +59,15 @@ export function normalizeBaseConfig(
   return {
     ...base,
     ...rest,
-    dns: { ...base.dns, ...(dns ?? {}) },
+    dns: {
+      ...base.dns,
+      ...(dns ?? {}),
+      // 嵌套对象再深合并一层，避免部分字段被整体替换
+      'fallback-filter': {
+        ...base.dns['fallback-filter'],
+        ...(dns?.['fallback-filter'] ?? {}),
+      },
+    },
   };
 }
 
@@ -64,8 +84,18 @@ export const DEFAULT_BASE_CONFIG: BaseConfig = {
     'default-nameserver': ['223.5.5.5', '119.29.29.29'],
     'enhanced-mode': 'fake-ip',
     'fake-ip-range': '198.18.0.1/16',
+    'fake-ip-filter': ['*.lan', '*.local', '+.market.xiaomi.com'],
     'use-hosts': true,
     nameserver: [...DEFAULT_NAMESERVERS],
     'proxy-server-nameserver': [...DEFAULT_NAMESERVERS],
+    'nameserver-policy': {},
+    fallback: [],
+    'fallback-filter': {
+      geoip: true,
+      'geoip-code': 'CN',
+      geosite: [],
+      ipcidr: ['240.0.0.0/4'],
+      domain: [],
+    },
   },
 };

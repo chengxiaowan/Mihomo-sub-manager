@@ -25,7 +25,7 @@ export class ProfileService {
   async findOne(id: string) {
     const profile = await this.prisma.profile.findUnique({
       where: { id },
-      include: { groups: true },
+      include: { groups: true, providers: true },
     });
     if (!profile) throw new NotFoundException(`Profile ${id} not found`);
     return profile;
@@ -41,9 +41,28 @@ export class ProfileService {
           include: { nodes: { where: { enabled: true } } },
         },
         rules: { where: { enabled: true }, orderBy: { sort: 'asc' } },
+        providers: { where: { enabled: true } },
       },
     });
     if (!profile) throw new NotFoundException(`Profile not found`);
+    return profile;
+  }
+
+  // 按 id 加载用于生成/校验的完整数据（与 findByToken 同结构，但不要求 enabled）
+  async findForGenerate(id: string) {
+    const profile = await this.prisma.profile.findUnique({
+      where: { id },
+      include: {
+        groups: {
+          where: { enabled: true },
+          orderBy: { sort: 'asc' },
+          include: { nodes: { where: { enabled: true } } },
+        },
+        rules: { where: { enabled: true }, orderBy: { sort: 'asc' } },
+        providers: { where: { enabled: true } },
+      },
+    });
+    if (!profile) throw new NotFoundException(`Profile ${id} not found`);
     return profile;
   }
 
@@ -133,6 +152,24 @@ export class ProfileService {
       status: 'success',
       message: `更新配置方案「${existing.name}」绑定的代理组，共 ${groupIds.length} 个`,
       detail: { groupCount: groupIds.length },
+    });
+    return profile;
+  }
+
+  async bindProviders(id: string, providerIds: string[]) {
+    const existing = await this.findOne(id);
+    const profile = await this.prisma.profile.update({
+      where: { id },
+      data: { providers: { set: providerIds.map((pid) => ({ id: pid })) } },
+      include: { providers: true },
+    });
+    this.opLog.record({
+      action: 'profile.bind-providers',
+      entityType: 'Profile',
+      entityId: id,
+      status: 'success',
+      message: `更新配置方案「${existing.name}」绑定的规则集，共 ${providerIds.length} 个`,
+      detail: { providerCount: providerIds.length },
     });
     return profile;
   }

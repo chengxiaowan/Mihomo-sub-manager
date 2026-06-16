@@ -1,0 +1,48 @@
+# ---- builder：装全量依赖、编译 ----
+FROM node:22.14-bookworm-slim AS builder
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/server/package.json apps/server/package.json
+COPY apps/web/package.json apps/web/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+ENV DATABASE_URL=file:/app/data/app.db
+
+RUN pnpm --dir apps/server run build
+
+# ---- runner：仅生产依赖 + 编译产物（不含源码/devDeps）----
+FROM node:22.14-bookworm-slim AS runner
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
+
+ENV NODE_ENV=production
+ENV DATABASE_URL=file:/app/data/app.db
+
+# 仅安装生产依赖（prisma CLI 与 dotenv 已在 dependencies 中）
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/server/package.json apps/server/package.json
+COPY apps/web/package.json apps/web/package.json
+# schema / 迁移 / config —— 供安装期 postinstall 与运行期 migrate/generate 使用
+COPY apps/server/prisma ./apps/server/prisma
+COPY apps/server/prisma.config.ts ./apps/server/prisma.config.ts
+
+RUN pnpm install --frozen-lockfile --prod
+
+# 编译产物 + 重新生成 Prisma Client（确保查询引擎随生产依赖就位）
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+RUN pnpm --dir apps/server prisma generate
+
+WORKDIR /app/apps/server
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/main.js"]

@@ -4,11 +4,12 @@ import { Message, Modal } from "@arco-design/web-vue";
 import { profileApi, defaultBaseConfig, type Profile, type BaseConfig } from "@/api/profiles";
 import { groupApi, type ProxyGroup } from "@/api/groups";
 import { profileRuleApi, type ProfileRule } from "@/api/profile-rules";
+import { ruleProviderApi, type RuleProvider } from "@/api/rule-providers";
 import { useConfigStore } from "@/stores/config";
 
 const config = useConfigStore();
 
-const RULE_TYPES = ["DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6", "GEOIP", "PROCESS-NAME"];
+const RULE_TYPES = ["DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "IP-CIDR", "IP-CIDR6", "GEOIP", "PROCESS-NAME", "RULE-SET"];
 const BUILTIN_POLICIES = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
 const MODE_OPTIONS = ["rule", "global", "direct"];
 const LOG_LEVEL_OPTIONS = ["silent", "error", "warning", "info", "debug"];
@@ -34,6 +35,13 @@ const allGroups = ref<ProxyGroup[]>([]);
 const boundGroupIds = ref<string[]>([]);
 const groupsSaving = ref(false);
 
+const allProviders = ref<RuleProvider[]>([]);
+const boundProviderIds = ref<string[]>([]);
+const providersSaving = ref(false);
+const boundProviders = computed(() =>
+  allProviders.value.filter((p) => boundProviderIds.value.includes(p.id))
+);
+
 const rules = ref<ProfileRule[]>([]);
 const rulesLoading = ref(false);
 
@@ -42,6 +50,31 @@ const overviewSaving = ref(false);
 
 const baseForm = ref<BaseConfig>(defaultBaseConfig());
 const baseSaving = ref(false);
+
+// DNS 分流（nameserver-policy）：map ↔ 可编辑行
+type NsRow = { pattern: string; servers: string[] };
+const nsRows = ref<NsRow[]>([]);
+function loadNsRows() {
+  const map = baseForm.value.dns["nameserver-policy"] || {};
+  nsRows.value = Object.entries(map).map(([pattern, servers]) => ({
+    pattern,
+    servers: Array.isArray(servers) ? servers : [servers as string],
+  }));
+}
+function addNsRow() {
+  nsRows.value.push({ pattern: "", servers: [] });
+}
+function removeNsRow(i: number) {
+  nsRows.value.splice(i, 1);
+}
+function applyNsRows() {
+  const map: Record<string, string[]> = {};
+  for (const r of nsRows.value) {
+    const p = r.pattern.trim();
+    if (p && r.servers.length) map[p] = r.servers;
+  }
+  baseForm.value.dns["nameserver-policy"] = map;
+}
 
 const boundGroups = computed(() =>
   allGroups.value.filter((g) => boundGroupIds.value.includes(g.id))
@@ -58,6 +91,18 @@ const editingRule = ref<ProfileRule | null>(null);
 const ruleForm = ref({ type: "DOMAIN-SUFFIX", value: "", policy: "" });
 const ruleSubmitting = ref(false);
 
+const validating = ref(false);
+const validateResult = ref<{ errors: string[]; warnings: string[] } | null>(null);
+async function runValidate() {
+  if (!detail.value) return;
+  validating.value = true;
+  try {
+    validateResult.value = await profileApi.validate(detail.value.id);
+  } finally {
+    validating.value = false;
+  }
+}
+
 function publishUrl(token: string) {
   return `${config.serverUrl.replace(/\/$/, "")}/publish/${token}.yaml`;
 }
@@ -71,6 +116,7 @@ async function load() {
   try {
     list.value = await profileApi.list();
     if (!allGroups.value.length) allGroups.value = await groupApi.list();
+    if (!allProviders.value.length) allProviders.value = await ruleProviderApi.list();
     if (list.value.length) {
       const stillExists = list.value.some((p) => p.id === selectedId.value);
       await selectProfile(stillExists ? selectedId.value! : list.value[0].id);
@@ -91,9 +137,26 @@ async function selectProfile(id: string) {
     detail.value = d;
     overviewForm.value = { name: d.name, defaultPolicy: d.defaultPolicy };
     boundGroupIds.value = (d.groups ?? []).map((g) => g.id);
-    baseForm.value = d.baseConfig
-      ? { ...defaultBaseConfig(), ...d.baseConfig, dns: { ...defaultBaseConfig().dns, ...d.baseConfig.dns } }
-      : defaultBaseConfig();
+    boundProviderIds.value = (d.providers ?? []).map((p) => p.id);
+    validateResult.value = null;
+    if (d.baseConfig) {
+      const def = defaultBaseConfig();
+      baseForm.value = {
+        ...def,
+        ...d.baseConfig,
+        dns: {
+          ...def.dns,
+          ...d.baseConfig.dns,
+          "fallback-filter": {
+            ...def.dns["fallback-filter"],
+            ...d.baseConfig.dns?.["fallback-filter"],
+          },
+        },
+      };
+    } else {
+      baseForm.value = defaultBaseConfig();
+    }
+    loadNsRows();
     await loadRules(id);
   } finally {
     detailLoading.value = false;
@@ -195,6 +258,26 @@ async function saveGroups() {
   }
 }
 
+// ── 规则集 ────────────────────────────────────────────────────
+function toggleProvider(id: string) {
+  boundProviderIds.value.includes(id)
+    ? (boundProviderIds.value = boundProviderIds.value.filter((v) => v !== id))
+    : boundProviderIds.value.push(id);
+}
+async function saveProviders() {
+  if (!detail.value) return;
+  providersSaving.value = true;
+  try {
+    await profileApi.bindProviders(detail.value.id, boundProviderIds.value);
+    if (detail.value) {
+      detail.value.providers = boundProviders.value.map((p) => ({ id: p.id, name: p.name }));
+    }
+    Message.success("规则集已保存");
+  } finally {
+    providersSaving.value = false;
+  }
+}
+
 // ── 规则 ──────────────────────────────────────────────────────
 function openAddRule() {
   editingRule.value = null;
@@ -240,9 +323,11 @@ async function toggleRule(r: ProfileRule) {
 // ── 基础设置 ──────────────────────────────────────────────────
 function resetBaseConfig() {
   baseForm.value = defaultBaseConfig();
+  loadNsRows();
 }
 async function saveBaseConfig() {
   if (!detail.value) return;
+  applyNsRows();
   baseSaving.value = true;
   try {
     await profileApi.update(detail.value.id, { baseConfig: baseForm.value });
@@ -369,6 +454,30 @@ onMounted(load);
             </div>
           </a-tab-pane>
 
+          <!-- 规则集 -->
+          <a-tab-pane key="providers" title="规则集">
+            <div class="tab-toolbar">
+              <span class="tab-hint">已绑定 {{ boundProviderIds.length }} / {{ allProviders.length }} 个规则集</span>
+              <a-button type="primary" :loading="providersSaving" @click="saveProviders">保存绑定</a-button>
+            </div>
+            <p class="tab-hint" style="margin-bottom:12px">
+              绑定后即可在「规则」里用 <code>RULE-SET</code> 类型引用这些规则集。
+            </p>
+            <div class="bind-list">
+              <label
+                v-for="p in allProviders" :key="p.id"
+                class="bind-item" :class="{ selected: boundProviderIds.includes(p.id) }"
+                @click="toggleProvider(p.id)"
+              >
+                <span class="bind-name">{{ p.name }}</span>
+                <a-tag size="small">{{ p.type }}</a-tag>
+                <a-tag size="small" color="arcoblue">{{ p.behavior }}</a-tag>
+                <icon-check v-if="boundProviderIds.includes(p.id)" style="color:#1668dc;margin-left:auto" />
+              </label>
+              <a-empty v-if="allProviders.length === 0" description="还没有规则集，去「规则集」菜单创建" />
+            </div>
+          </a-tab-pane>
+
           <!-- 规则 -->
           <a-tab-pane key="rules" title="规则">
             <div class="tab-toolbar">
@@ -478,6 +587,48 @@ onMounted(load);
               <a-form-item label="代理节点 DNS (proxy-server-nameserver)">
                 <a-input-tag v-model="baseForm.dns['proxy-server-nameserver']" placeholder="回车添加，支持 DoH" allow-clear />
               </a-form-item>
+              <a-form-item label="Fake-IP 排除 (fake-ip-filter)">
+                <a-input-tag v-model="baseForm.dns['fake-ip-filter']" placeholder="回车添加，支持通配，如 *.lan" allow-clear />
+              </a-form-item>
+              <a-form-item label="回退 DNS (fallback)">
+                <a-input-tag v-model="baseForm.dns.fallback" placeholder="回车添加，国外 DNS，支持 DoH" allow-clear />
+              </a-form-item>
+
+              <div class="base-section-title">回退过滤 (fallback-filter)</div>
+              <a-row :gutter="16">
+                <a-col :span="8">
+                  <a-form-item label="按 GeoIP (geoip)"><a-switch v-model="baseForm.dns['fallback-filter'].geoip" /></a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="GeoIP 代码 (geoip-code)">
+                    <a-input v-model="baseForm.dns['fallback-filter']['geoip-code']" placeholder="CN" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="GeoSite (geosite)">
+                <a-input-tag v-model="baseForm.dns['fallback-filter'].geosite" placeholder="回车添加，如 gfw" allow-clear />
+              </a-form-item>
+              <a-form-item label="IP 网段 (ipcidr)">
+                <a-input-tag v-model="baseForm.dns['fallback-filter'].ipcidr" placeholder="回车添加，如 240.0.0.0/4" allow-clear />
+              </a-form-item>
+              <a-form-item label="域名 (domain)">
+                <a-input-tag v-model="baseForm.dns['fallback-filter'].domain" placeholder="回车添加，如 +.google.com" allow-clear />
+              </a-form-item>
+
+              <div class="base-section-title">DNS 分流 (nameserver-policy)</div>
+              <p class="tab-hint" style="margin-bottom:12px">
+                按「域名 / geosite 分类」精确指定用哪组 DNS 解析；命中规则的域名直接走对应 DNS，不再经污染判断。
+              </p>
+              <div v-for="(row, i) in nsRows" :key="i" class="ns-row">
+                <a-input v-model="row.pattern" class="ns-pattern" placeholder="geosite:cn 或 +.example.com" allow-clear />
+                <a-input-tag v-model="row.servers" class="ns-servers" placeholder="回车添加 DNS，支持 DoH" allow-clear />
+                <a-button class="ns-del" status="danger" @click="removeNsRow(i)">
+                  <template #icon><icon-delete /></template>
+                </a-button>
+              </div>
+              <a-button type="outline" size="small" @click="addNsRow">
+                <template #icon><icon-plus /></template>添加分流规则
+              </a-button>
             </a-form>
           </a-tab-pane>
 
@@ -492,9 +643,35 @@ onMounted(load);
                 </a-button>
               </div>
               <p class="publish-tip">在 Mihomo 客户端中导入此链接即可使用。</p>
-              <a-button @click="regenerateToken">
-                <template #icon><icon-refresh /></template>重新生成 Token
-              </a-button>
+              <a-space>
+                <a-button :loading="validating" @click="runValidate">
+                  <template #icon><icon-check-circle /></template>校验配置
+                </a-button>
+                <a-button @click="regenerateToken">
+                  <template #icon><icon-refresh /></template>重新生成 Token
+                </a-button>
+              </a-space>
+
+              <div v-if="validateResult" class="validate-box">
+                <a-alert
+                  v-if="validateResult.errors.length === 0 && validateResult.warnings.length === 0"
+                  type="success"
+                >
+                  校验通过，可正常发布。
+                </a-alert>
+                <a-alert v-if="validateResult.errors.length" type="error" style="margin-bottom:8px">
+                  <template #title>{{ validateResult.errors.length }} 个错误（会导致发布失败）</template>
+                  <ul class="validate-list">
+                    <li v-for="(e, i) in validateResult.errors" :key="i">{{ e }}</li>
+                  </ul>
+                </a-alert>
+                <a-alert v-if="validateResult.warnings.length" type="warning">
+                  <template #title>{{ validateResult.warnings.length }} 个告警（不阻断发布）</template>
+                  <ul class="validate-list">
+                    <li v-for="(w, i) in validateResult.warnings" :key="i">{{ w }}</li>
+                  </ul>
+                </a-alert>
+              </div>
             </div>
           </a-tab-pane>
         </a-tabs>
@@ -532,7 +709,15 @@ onMounted(load);
             <a-option v-for="t in RULE_TYPES" :key="t" :value="t">{{ t }}</a-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="匹配值">
+        <a-form-item v-if="ruleForm.type === 'RULE-SET'" label="规则集">
+          <a-select v-model="ruleForm.value" allow-search placeholder="选择已绑定的规则集">
+            <a-option v-for="p in boundProviders" :key="p.id" :value="p.name">{{ p.name }}</a-option>
+          </a-select>
+          <template v-if="boundProviders.length === 0">
+            <p class="tab-hint" style="margin-top:6px">先在「规则集」标签页绑定规则集。</p>
+          </template>
+        </a-form-item>
+        <a-form-item v-else label="匹配值">
           <a-input v-model="ruleForm.value" placeholder="openai.com" />
         </a-form-item>
         <a-form-item label="去向">
@@ -589,6 +774,7 @@ onMounted(load);
 
 /* 右栏 */
 .profile-detail {
+  min-width: 0; /* 允许 1fr 列收缩，内容溢出时内部处理而非撑出横向滚动条 */
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
@@ -658,6 +844,14 @@ onMounted(load);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .publish-tip { font-size: 12px; color: var(--color-text-3); margin: 10px 0 18px; }
+.validate-box { margin-top: 16px; }
+.validate-list { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+
+/* DNS 分流行 */
+.ns-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.ns-pattern { width: 240px; flex: 0 0 240px; }
+.ns-servers { flex: 1; min-width: 0; }
+.ns-del { flex: 0 0 auto; }
 
 @media (max-width: 900px) {
   .profiles-shell { grid-template-columns: 1fr; }

@@ -61,4 +61,13 @@ export class ProfileController {
   bindGroups(@Param('id') id: string, @Body() body: { groupIds: string[] }) {
     return this.service.bindGroups(id, body.groupIds);
   }
+
+  @Put(':id/providers')
+  @ApiOperation({ summary: '绑定规则集（全量覆盖）' })
+  bindProviders(
+    @Param('id') id: string,
+    @Body() body: { providerIds: string[] },
+  ) {
+    return this.service.bindProviders(id, body.providerIds);
+  }
 }

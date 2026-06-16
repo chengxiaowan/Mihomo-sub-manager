@@ -36,13 +36,18 @@ model ProxyNode {
 }
 
 model ProxyGroup {
-  id       String      @id @default(cuid())
-  name     String
-  type     String
-  enabled  Boolean     @default(true)
-  sort     Int         @default(0)
-  nodes    ProxyNode[]
-  profiles Profile[]
+  id        String      @id @default(cuid())
+  name      String
+  type      String
+  enabled   Boolean     @default(true)
+  sort      Int         @default(0)
+  url       String?     // 测速地址（url-test/fallback/load-balance）
+  interval  Int?        // 测速间隔（秒）
+  tolerance Int?        // 容差（毫秒，仅 url-test）
+  lazy      Boolean?    // 惰性测速（仅使用时测）
+  filter    String?     // 正则过滤代理
+  nodes     ProxyNode[]
+  profiles  Profile[]
 }
 
 model ProfileRule {
@@ -58,15 +63,33 @@ model ProfileRule {
 }
 
 model Profile {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String
-  token         String        @unique
-  enabled       Boolean       @default(true)
-  defaultPolicy String        @default("DIRECT")
+  token         String         @unique
+  enabled       Boolean        @default(true)
+  defaultPolicy String         @default("DIRECT")
   baseConfig    Json?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime       @default(now())
   groups        ProxyGroup[]
   rules         ProfileRule[]
+  providers     RuleProvider[]
+}
+
+model RuleProvider {
+  id        String    @id @default(cuid())
+  name      String    @unique // 引用名，用于 RULE-SET,<name>,<policy>
+  type      String // http | file | inline
+  behavior  String // domain | ipcidr | classical
+  format    String    @default("yaml") // yaml | text | mrs
+  url       String? // http 时必填
+  path      String? // 缓存/本地路径，http 不填则生成器默认 ./ruleset/<name>.yaml
+  interval  Int? // 秒，http 更新间隔
+  proxy     String? // 经由某代理组下载
+  payload   String    @default("[]") // inline 规则数组（JSON 字符串）
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  profiles  Profile[]
 }
 
 model RuleTemplate {

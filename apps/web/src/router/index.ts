@@ -39,6 +39,11 @@ const routes = [
         component: () => import("@/views/rule-market.vue"),
       },
       {
+        path: "rule-providers",
+        name: "RuleProviders",
+        component: () => import("@/views/rule-providers.vue"),
+      },
+      {
         path: "logs",
         name: "OperationLogs",
         component: () => import("@/views/operation-logs.vue"),

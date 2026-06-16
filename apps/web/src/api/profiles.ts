@@ -1,14 +1,26 @@
 import client from "./client";
 
+export interface FallbackFilter {
+  geoip: boolean;
+  "geoip-code": string;
+  geosite: string[];
+  ipcidr: string[];
+  domain: string[];
+}
+
 export interface DnsConfig {
   enable: boolean;
   ipv6: boolean;
   "default-nameserver": string[];
   "enhanced-mode": string;
   "fake-ip-range": string;
+  "fake-ip-filter": string[];
   "use-hosts": boolean;
   nameserver: string[];
   "proxy-server-nameserver": string[];
+  "nameserver-policy": Record<string, string[]>;
+  fallback: string[];
+  "fallback-filter": FallbackFilter;
 }
 
 export interface BaseConfig {
@@ -30,6 +42,7 @@ export interface Profile {
   baseConfig?: BaseConfig | null;
   createdAt: string;
   groups?: { id: string; name: string; type: string }[];
+  providers?: { id: string; name: string }[];
   _count?: { groups: number; rules: number };
 }
 
@@ -56,9 +69,19 @@ export function defaultBaseConfig(): BaseConfig {
       "default-nameserver": ["223.5.5.5", "119.29.29.29"],
       "enhanced-mode": "fake-ip",
       "fake-ip-range": "198.18.0.1/16",
+      "fake-ip-filter": ["*.lan", "*.local", "+.market.xiaomi.com"],
       "use-hosts": true,
       nameserver: [...DEFAULT_NAMESERVERS],
       "proxy-server-nameserver": [...DEFAULT_NAMESERVERS],
+      "nameserver-policy": {},
+      fallback: [],
+      "fallback-filter": {
+        geoip: true,
+        "geoip-code": "CN",
+        geosite: [],
+        ipcidr: ["240.0.0.0/4"],
+        domain: [],
+      },
     },
   };
 }
@@ -77,4 +100,8 @@ export const profileApi = {
     client.post<{ token: string }>(`/profiles/${id}/token/regenerate`).then((r) => r.data),
   bindGroups: (id: string, groupIds: string[]) =>
     client.put(`/profiles/${id}/groups`, { groupIds }).then((r) => r.data),
+  bindProviders: (id: string, providerIds: string[]) =>
+    client.put(`/profiles/${id}/providers`, { providerIds }).then((r) => r.data),
+  validate: (id: string) =>
+    client.get<{ errors: string[]; warnings: string[] }>(`/profiles/${id}/validate`).then((r) => r.data),
 };

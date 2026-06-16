@@ -11,6 +11,7 @@ import { ProxyGroupModule } from './proxy-group/proxy-group.module';
 import { ProfileModule } from './profile/profile.module';
 import { ProfileRuleModule } from './profile-rule/profile-rule.module';
 import { RuleTemplateModule } from './rule-template/rule-template.module';
+import { RuleProviderModule } from './rule-provider/rule-provider.module';
 import { GeneratorModule } from './generator/generator.module';
 import { PublishModule } from './publish/publish.module';
 
@@ -25,6 +26,7 @@ import { PublishModule } from './publish/publish.module';
     ProfileModule,
     ProfileRuleModule,
     RuleTemplateModule,
+    RuleProviderModule,
     GeneratorModule,
     PublishModule,
   ],

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { Message, Modal } from "@arco-design/web-vue";
-import { groupApi, type ProxyGroup } from "@/api/groups";
+import { groupApi, type ProxyGroup, type ProxyGroupInput } from "@/api/groups";
 import { nodeApi, type ProxyNode } from "@/api/nodes";
 import { nodeTypeColor } from "@/utils/badges";
 
@@ -31,8 +31,28 @@ const detail = ref<ProxyGroup | null>(null);
 const detailLoading = ref(false);
 const activeTab = ref("overview");
 
-const overviewForm = ref({ name: "", type: "select" });
+type OverviewForm = {
+  name: string;
+  type: string;
+  url: string;
+  interval?: number;
+  tolerance?: number;
+  lazy: boolean;
+  filter: string;
+};
+const overviewForm = ref<OverviewForm>({
+  name: "",
+  type: "select",
+  url: "",
+  interval: undefined,
+  tolerance: undefined,
+  lazy: false,
+  filter: "",
+});
 const overviewSaving = ref(false);
+const isTestingType = computed(() =>
+  ["url-test", "fallback", "load-balance"].includes(overviewForm.value.type)
+);
 
 // 成员节点
 const allNodes = ref<ProxyNode[]>([]);
@@ -94,7 +114,15 @@ async function selectGroup(id: string) {
   try {
     const d = await groupApi.get(id);
     detail.value = d;
-    overviewForm.value = { name: d.name, type: d.type };
+    overviewForm.value = {
+      name: d.name,
+      type: d.type,
+      url: d.url ?? "",
+      interval: d.interval ?? undefined,
+      tolerance: d.tolerance ?? undefined,
+      lazy: d.lazy ?? false,
+      filter: d.filter ?? "",
+    };
     selectedNodeIds.value = (d.nodes ?? []).map((n) => n.id);
   } finally {
     detailLoading.value = false;
@@ -109,10 +137,19 @@ async function saveOverview() {
   }
   overviewSaving.value = true;
   try {
-    const updated = await groupApi.update(detail.value.id, {
-      name: overviewForm.value.name,
-      type: overviewForm.value.type,
-    });
+    const f = overviewForm.value;
+    const payload: ProxyGroupInput = {
+      name: f.name,
+      type: f.type,
+      url: f.url,
+      filter: f.filter,
+    };
+    if (isTestingType.value) {
+      if (f.interval != null) payload.interval = f.interval;
+      payload.lazy = f.lazy;
+    }
+    if (f.type === "url-test" && f.tolerance != null) payload.tolerance = f.tolerance;
+    const updated = await groupApi.update(detail.value.id, payload);
     detail.value = { ...detail.value, ...updated };
     patchListItem(detail.value.id, { name: updated.name, type: updated.type });
     Message.success("已保存");
@@ -253,6 +290,34 @@ onMounted(load);
                   <a-option v-for="(conf, key) in TYPE_CONFIG" :key="key" :value="key">{{ conf.label }}</a-option>
                 </a-select>
               </a-form-item>
+
+              <a-divider orientation="left" style="font-size:13px">高级设置</a-divider>
+              <a-row :gutter="16">
+                <a-col v-if="isTestingType" :span="12">
+                  <a-form-item label="测速地址 (url)">
+                    <a-input v-model="overviewForm.url" placeholder="http://www.gstatic.com/generate_204" allow-clear />
+                  </a-form-item>
+                </a-col>
+                <a-col v-if="isTestingType" :span="12">
+                  <a-form-item label="测速间隔 (interval，秒)">
+                    <a-input-number v-model="overviewForm.interval" :min="1" placeholder="300" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col v-if="overviewForm.type === 'url-test'" :span="12">
+                  <a-form-item label="容差 (tolerance，毫秒)">
+                    <a-input-number v-model="overviewForm.tolerance" :min="0" placeholder="不设置" style="width:100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col v-if="isTestingType" :span="12">
+                  <a-form-item label="惰性测速 (lazy)">
+                    <a-switch v-model="overviewForm.lazy" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="代理过滤 (filter，正则)">
+                <a-input v-model="overviewForm.filter" placeholder="如 (?i)香港|HK，留空不过滤" allow-clear />
+              </a-form-item>
+
               <a-button type="primary" :loading="overviewSaving" @click="saveOverview">保存</a-button>
             </a-form>
           </a-tab-pane>
@@ -372,6 +437,7 @@ onMounted(load);
 
 /* 右栏 */
 .md-detail {
+  min-width: 0;
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
