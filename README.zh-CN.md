@@ -97,7 +97,7 @@ Profile -> 生成 Mihomo YAML -> /publish/:token.yaml
 
 ## 环境要求
 
-- Node.js v22，见 [.nvmrc](.nvmrc)
+- Node.js v24，见 [.nvmrc](.nvmrc)
 - pnpm 10.26.0
 - Docker 和 Docker Compose，部署时需要
 

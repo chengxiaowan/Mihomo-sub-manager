@@ -97,7 +97,7 @@ Profile -> Mihomo YAML -> /publish/:token.yaml
 
 ## Requirements
 
-- Node.js v22, see [.nvmrc](.nvmrc)
+- Node.js v24, see [.nvmrc](.nvmrc)
 - pnpm 10.26.0
 - Docker and Docker Compose for deployment
 

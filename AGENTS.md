@@ -15,7 +15,7 @@ Primary product flow:
 
 ## Environment
 
-- Node version: `v22` from `.nvmrc`.
+- Node version: `v24` from `.nvmrc`.
 - Package manager: `pnpm@10.26.0`.
 - Backend env file: `apps/server/.env`.
 - Prisma reads `DATABASE_URL` through `apps/server/prisma.config.ts`; default project docs expect `file:../../data/app.db` from `apps/server`.
