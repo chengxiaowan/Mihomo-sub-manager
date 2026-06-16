@@ -1,0 +1,36 @@
+# VPS 部署用：直接拉取 CI 构建好的镜像，不在本机构建。
+# 用法：TAG=dev docker compose -f docker-compose.prod.yml up -d
+# （合并到 main 后可用默认的 :latest）
+services:
+  server:
+    image: ghcr.io/chengxiaowan/mihomo-sub-manager-server:${TAG:-latest}
+    container_name: mihomo-sub-manager-server
+    environment:
+      DATABASE_URL: file:/app/data/app.db
+      API_KEY: 735c73664f834be75baa367ffc3c613fe49d772c85f91c7c
+      PORT: 3000
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/chengxiaowan/mihomo-sub-manager-web:${TAG:-latest}
+    container_name: mihomo-sub-manager-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
