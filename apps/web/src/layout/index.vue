@@ -50,6 +50,16 @@ function logout() {
         </nav>
 
         <div class="account">
+          <a
+            class="github-link"
+            href="https://github.com/chengxiaowan/Mihomo-sub-manager"
+            target="_blank"
+            rel="noreferrer"
+            title="GitHub"
+            aria-label="GitHub"
+          >
+            <icon-github />
+          </a>
           <a-button
             class="theme-button"
             shape="circle"
@@ -145,7 +155,24 @@ function logout() {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+}
+
+.github-link {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--color-text-2);
+  border-radius: 7px;
+  font-size: 20px;
+  text-decoration: none;
+
+  &:hover {
+    color: rgb(var(--arcoblue-6));
+    background: var(--color-fill-2);
+  }
 }
 
 .theme-button {

@@ -6,8 +6,8 @@ services:
     container_name: mihomo-sub-manager-server
     environment:
       DATABASE_URL: file:/app/data/app.db
-      # 订阅管理后台的访问密钥，前端 /setup 需填同一个值；可自行改成任意字符串
-      API_KEY: 735c73664f834be75baa367ffc3c613fe49d772c85f91c7c
+      # 订阅管理后台的访问密钥，前端 /setup 需填同一个值。
+      API_KEY: ${API_KEY:-change-me}
       PORT: 3000
     volumes:
       - ./data:/app/data

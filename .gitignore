@@ -2,3 +2,7 @@ node_modules
 /doc
 data/app.db
 .pnpm-store
+.env
+apps/*/.env
+!*.env.example
+!apps/*/.env.example

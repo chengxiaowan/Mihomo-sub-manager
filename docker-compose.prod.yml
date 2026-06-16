@@ -7,7 +7,7 @@ services:
     container_name: mihomo-sub-manager-server
     environment:
       DATABASE_URL: file:/app/data/app.db
-      API_KEY: 735c73664f834be75baa367ffc3c613fe49d772c85f91c7c
+      API_KEY: ${API_KEY:-change-me}
       PORT: 3000
     volumes:
       - ./data:/app/data
