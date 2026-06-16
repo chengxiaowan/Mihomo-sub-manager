@@ -14,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false # 一个失败不连带取消另一个，便于定位真实错误
       matrix:
         service: [server, web] # 同时构建两个镜像
     steps:
