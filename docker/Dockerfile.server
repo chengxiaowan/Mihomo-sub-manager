@@ -20,7 +20,9 @@ COPY . .
 ENV DATABASE_URL=file:/app/data/app.db
 
 # 先生成 Prisma Client（nest build 需要其类型），再编译
-RUN pnpm --dir apps/server prisma generate && pnpm --dir apps/server run build
+WORKDIR /app/apps/server
+RUN pnpm prisma generate && pnpm run build
+WORKDIR /app
 
 # ---- runner：仅生产依赖 + 编译产物（不含源码/devDeps）----
 FROM node:24-bookworm-slim AS runner
@@ -48,9 +50,8 @@ RUN pnpm install --frozen-lockfile --prod
 
 # 编译产物 + 重新生成 Prisma Client（确保查询引擎随生产依赖就位）
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
-RUN pnpm --dir apps/server prisma generate
-
 WORKDIR /app/apps/server
+RUN pnpm prisma generate
 
 EXPOSE 3000
 
