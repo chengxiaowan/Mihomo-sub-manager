@@ -742,6 +742,10 @@ onMounted(load);
   gap: 20px;
   align-items: start;
 }
+/* 固定高度的左右框需把 padding/border 计入高度，否则会超出视口、两框不等高 */
+.profiles-shell > * {
+  box-sizing: border-box;
+}
 
 /* 左栏 */
 .profile-aside {
@@ -750,7 +754,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 156px);
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
@@ -775,11 +779,12 @@ onMounted(load);
 /* 右栏 */
 .profile-detail {
   min-width: 0; /* 允许 1fr 列收缩，内容溢出时内部处理而非撑出横向滚动条 */
+  height: calc(100vh - 156px); /* 与左栏等高 */
+  overflow-y: auto; /* 内容超出时框内滚动，不撑出整页 */
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
   padding: 22px 24px;
-  min-height: calc(100vh - 140px);
 }
 .detail-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

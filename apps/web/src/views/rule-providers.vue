@@ -355,10 +355,11 @@ onMounted(load);
 
 <style scoped lang="less">
 .md-shell { display: grid; grid-template-columns: 260px 1fr; gap: 20px; align-items: start; }
+.md-shell > * { box-sizing: border-box; }
 
 .md-aside {
   position: sticky; top: 0; display: flex; flex-direction: column; gap: 12px;
-  height: calc(100vh - 140px); background: var(--color-bg-1);
+  height: calc(100vh - 156px); background: var(--color-bg-1);
   border: 1px solid var(--color-border-2); border-radius: 14px; padding: 14px;
 }
 .aside-search { flex: 0 0 auto; }
@@ -378,8 +379,10 @@ onMounted(load);
 
 .md-detail {
   min-width: 0;
+  height: calc(100vh - 156px);
+  overflow-y: auto;
   background: var(--color-bg-1); border: 1px solid var(--color-border-2);
-  border-radius: 14px; padding: 22px 24px; min-height: calc(100vh - 140px);
+  border-radius: 14px; padding: 22px 24px;
 }
 .detail-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

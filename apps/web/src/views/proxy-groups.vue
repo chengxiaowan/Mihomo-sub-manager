@@ -405,6 +405,7 @@ onMounted(load);
   gap: 20px;
   align-items: start;
 }
+.md-shell > * { box-sizing: border-box; }
 
 /* 左栏 */
 .md-aside {
@@ -413,7 +414,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 156px);
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
@@ -438,11 +439,12 @@ onMounted(load);
 /* 右栏 */
 .md-detail {
   min-width: 0;
+  height: calc(100vh - 156px);
+  overflow-y: auto;
   background: var(--color-bg-1);
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
   padding: 22px 24px;
-  min-height: calc(100vh - 140px);
 }
 .detail-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
