@@ -66,6 +66,10 @@ pnpm run preview
 - Use Vue 3 SFCs with `<script setup lang="ts">` for frontend work.
 - Keep changes scoped to the requested task; avoid unrelated refactors or generated churn.
 
+## Communication
+
+- Reply to the user in Chinese unless they explicitly request another language.
+
 ## Verification
 
 - For backend changes, run the narrowest relevant command first, usually `pnpm run test` from `apps/server`; use `pnpm run build` when types or module wiring changed.

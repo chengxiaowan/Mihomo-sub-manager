@@ -70,25 +70,43 @@ export class ProxyGroupService {
   }
 
   async addNodes(id: string, dto: ManageNodesDto) {
-    await this.findOne(id);
-    return this.prisma.proxyGroup.update({
+    const existing = await this.findOne(id);
+    const group = await this.prisma.proxyGroup.update({
       where: { id },
       data: {
         nodes: { connect: dto.nodeIds.map((nodeId) => ({ id: nodeId })) },
       },
       include: { _count: { select: { nodes: true } } },
     });
+    this.opLog.record({
+      action: 'proxy-group.add-nodes',
+      entityType: 'ProxyGroup',
+      entityId: id,
+      status: 'success',
+      message: `代理组「${existing.name}」新增 ${dto.nodeIds.length} 个成员节点`,
+      detail: { nodeCount: dto.nodeIds.length },
+    });
+    return group;
   }
 
   async removeNodes(id: string, dto: ManageNodesDto) {
-    await this.findOne(id);
-    return this.prisma.proxyGroup.update({
+    const existing = await this.findOne(id);
+    const group = await this.prisma.proxyGroup.update({
       where: { id },
       data: {
         nodes: { disconnect: dto.nodeIds.map((nodeId) => ({ id: nodeId })) },
       },
       include: { _count: { select: { nodes: true } } },
     });
+    this.opLog.record({
+      action: 'proxy-group.remove-nodes',
+      entityType: 'ProxyGroup',
+      entityId: id,
+      status: 'success',
+      message: `代理组「${existing.name}」移除 ${dto.nodeIds.length} 个成员节点`,
+      detail: { nodeCount: dto.nodeIds.length },
+    });
+    return group;
   }
 
   async setNodes(id: string, dto: ManageNodesDto) {

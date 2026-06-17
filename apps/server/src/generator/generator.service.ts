@@ -79,6 +79,9 @@ export class GeneratorService {
         .map((n) => n.name)
         .filter((name) => seenNames.has(name));
 
+      // 兜底：代理组成员为空时注入 DIRECT，避免 Mihomo 客户端因空 proxies 导入失败
+      if (memberNames.length === 0) memberNames.push('DIRECT');
+
       const entry: Record<string, unknown> = {
         name: group.name,
         type: group.type,

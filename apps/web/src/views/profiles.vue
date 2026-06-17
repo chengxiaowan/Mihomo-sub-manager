@@ -325,9 +325,44 @@ function resetBaseConfig() {
   baseForm.value = defaultBaseConfig();
   loadNsRows();
 }
+// 校验基础设置关键字段格式，返回首个错误信息（无错误返回 null）
+function validateBaseConfig(): string | null {
+  const b = baseForm.value;
+  const port = b["mixed-port"];
+  if (port == null || !Number.isInteger(port) || port < 1 || port > 65535) {
+    return "混合端口需为 1-65535 的整数";
+  }
+  const ctrl = (b["external-controller"] ?? "").trim();
+  // host:port，host 可为 IP / 域名 / 空（监听所有），port 必填
+  const ctrlMatch = ctrl.match(/^[\w.-]*:(\d{1,5})$/);
+  const ctrlPort = ctrlMatch ? Number(ctrlMatch[1]) : null;
+  if (ctrl && (!ctrlMatch || ctrlPort == null || ctrlPort < 1 || ctrlPort > 65535)) {
+    return "外部控制器格式应为 host:port，如 127.0.0.1:9090";
+  }
+  const range = (b.dns["fake-ip-range"] ?? "").trim();
+  const cidrMatch = range.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/);
+  const cidrValid =
+    !range ||
+    (cidrMatch != null &&
+      cidrMatch[1].split(".").every((part) => {
+        const n = Number(part);
+        return Number.isInteger(n) && n >= 0 && n <= 255;
+      }) &&
+      Number(cidrMatch[2]) >= 0 &&
+      Number(cidrMatch[2]) <= 32);
+  if (!cidrValid) {
+    return "Fake-IP 网段应为 CIDR 格式，如 198.18.0.1/16";
+  }
+  return null;
+}
 async function saveBaseConfig() {
   if (!detail.value) return;
   applyNsRows();
+  const err = validateBaseConfig();
+  if (err) {
+    Message.warning(err);
+    return;
+  }
   baseSaving.value = true;
   try {
     await profileApi.update(detail.value.id, { baseConfig: baseForm.value });
